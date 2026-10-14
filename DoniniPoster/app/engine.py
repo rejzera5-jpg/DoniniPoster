@@ -122,6 +122,8 @@ class Engine:
         from .brands import brand_of_product
         brand = brand_of_product(product)
         use_brand = site.get("title_brand", site.get("id") in BRAND_SITES)
+        if product.get("no_brand"):  # в очереди выключено «с брендом» — бренд не ставится нигде
+            use_brand, brand = False, ""
         title, body = build_texts(line.get("template", "bags"), lang, product.get("size", ""),
                                   product["code"], brand=brand if use_brand else "",
                                   custom=self.cfg.get("custom_templates"))

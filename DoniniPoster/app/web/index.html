@@ -77,6 +77,9 @@
   .chips{display:flex;flex-wrap:wrap;gap:4px}
   .chip{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--surface-2);color:var(--muted);text-decoration:none;cursor:default;white-space:nowrap;border:1px solid transparent}
   .chip.done{background:var(--ok-soft);color:var(--ok);cursor:pointer}
+  .brandtg{padding:1px 7px;font-size:11px;margin-left:4px;border-radius:10px}
+  .brandtg.on{color:var(--ok);border-color:var(--ok)}
+  .brandtg.off{color:var(--err, #e5534b);border-color:var(--err, #e5534b)}
   .chip.error{background:var(--err-soft);color:var(--err);cursor:pointer}
   .chip.running{background:var(--run-soft);color:var(--run);animation:pulse 1.2s infinite}
   .chip.skipped{opacity:.45;text-decoration:line-through}
@@ -821,7 +824,8 @@ function renderQueue(siteMode){
         <td><img class="thumb" loading="lazy" src="/api/thumb?path=${encodeURIComponent(p.photos[0]||"")}" data-act="photos" data-pid="${p.id}" style="cursor:zoom-in" title="Посмотреть фото (можно убрать лишние)"></td>
         <td><span class="code">${esc(p.code)}</span></td>
         <td style="max-width:340px"><a data-act="card" data-pid="${p.id}" style="cursor:pointer">${esc(p.name)}</a>
-          <div class="small muted">${esc(lines[p.line]?.name || p.line)} · <span title="Шаблон текста объявления">🧾 ${esc(tpl(lines[p.line]))}</span> · ${p.photos.length} фото${p.brand ? ` · бренд: ${esc(p.brand)}` : ""}${p.photos_locked ? " · фото выбраны" : ""}</div></td>
+          <div class="small muted">${esc(lines[p.line]?.name || p.line)} · <span title="Шаблон текста объявления">🧾 ${esc(tpl(lines[p.line]))}</span> · ${p.photos.length} фото${p.photos_locked ? " · фото выбраны" : ""}
+            ${archived ? (p.no_brand ? " · без бренда" : "") : `<button class="sm brandtg ${p.no_brand ? "off" : "on"}" data-act="brand" data-pid="${p.id}" title="${p.no_brand ? "Сейчас: БЕЗ бренда — бренд не пишется ни в названии, ни в описании. Нажмите — включить" : "Сейчас: С брендом (на сайтах, где включено «бренд в название»). Нажмите — выгружать без бренда"}">${p.no_brand ? "🚫 без бренда" : "🏷 с брендом" + (p.brand ? ": " + esc(p.brand) : "")}</button>`}</div></td>
         <td>${archived ? esc(p.size) : `<input class="mini" data-edit="size" data-pid="${p.id}" value="${esc(p.size)}">`}</td>
         <td>${archived ? esc(p.price) : `<input class="tiny" data-edit="price" data-pid="${p.id}" value="${esc(p.price || "")}">`}</td>
         <td><div class="chips">${chips}</div></td>
@@ -857,6 +861,8 @@ for(const id of ["#qSite", "#qBoards"]){
     if(act === "texts") { textsModal(pid); return; }
     if(act === "card") { cardModal(pid); return; }
     if(act === "photos") { quickPhotos(pid); return; }
+    if(act === "brand"){ const p = S.products.find(x => x.id === pid); const off = !p.no_brand;
+      await post(`/api/product/${pid}`, {no_brand: off}); p.no_brand = off; toast(off ? "🚫 Товар выгружается без бренда" : "🏷 Товар выгружается с брендом"); }
     if(act === "retry") await post(`/api/product/${pid}/retry`, {});
     if(act === "folder") await post("/api/open_folder", {path});
     if(act === "remove" && confirm("Убрать товар из очереди?\n\nПапка с фото перенесётся в «_удалено» — оттуда её можно вернуть.")) await api(`/api/product/${pid}`, {method:"DELETE"});
@@ -1705,6 +1711,8 @@ function renderBulk(siteMode, rows){
     <select data-bulksel="line"><option value="">➡ Перенести в вид товара…</option>${lineOpts}</select>
     <button class="sm" data-bulk="price">💰 Цена…</button>
     <button class="sm" data-bulk="size">📏 Размер…</button>
+    <button class="sm" data-bulk="brand_on" title="Выбранные товары — с брендом">🏷 С брендом</button>
+    <button class="sm" data-bulk="brand_off" title="Выбранные товары — без бренда (бренд не пишется нигде)">🚫 Без бренда</button>
     <button class="sm danger" data-bulk="remove">🗑 Убрать</button>
     <span class="spacer"></span><button class="sm" data-bulk="clear">✕ Снять выбор</button></div>`);
 }
@@ -1758,6 +1766,7 @@ async function cardModal(pid){
         <div class="sc" style="display:block">🧾 Шаблон текста: <b id="cdTpl">${esc(d.template_label)}</b>
           <div class="small muted">Шаблон берётся из вида товара. Сменить вид — сменится шаблон. Поправить сам текст — «✏️ Тексты».</div></div>
         <label class="field">Бренд ${d.brand_manual ? "" : `<span class="muted">(найден автоматически)</span>`}<input id="cdBrand" value="${esc(d.brand)}"></label>
+        <label class="switch small"><input type="checkbox" id="cdWithBrand" ${d.no_brand ? "" : "checked"}> выгружать с брендом <span class="muted">(снять — бренд не пишется нигде)</span></label>
         <div class="row">
           <label class="field" style="flex:1">Размер<input id="cdSize" value="${esc(d.size)}"></label>
           <label class="field">Цена, зл<input id="cdPrice" class="mini" value="${esc(d.price ?? "")}"></label>
@@ -1782,14 +1791,14 @@ async function cardModal(pid){
     if(act === "save"){
       if(!sel.length) return alert("Оставьте хотя бы одно фото");
       const skip = {}; m.querySelectorAll("[data-site]").forEach(c => skip[c.dataset.site] = c.checked);
-      const body = {brand: $("#cdBrand", m).value, size: $("#cdSize", m).value, price: $("#cdPrice", m).value, line: $("#cdLine", m).value, skip_sites: skip};
+      const body = {no_brand: !$("#cdWithBrand", m).checked, brand: $("#cdBrand", m).value, size: $("#cdSize", m).value, price: $("#cdPrice", m).value, line: $("#cdLine", m).value, skip_sites: skip};
       if(sel.join("|") !== d.photos.join("|") || off.length !== d.others.length) body.photos = sel;
       await post(`/api/product/${pid}`, body);
       close(); toast("✓ Карточка сохранена"); refresh();
     }
   });
   const box = m.querySelector(".modal"); box.style.width = "min(1080px,100%)";
-  const redraw = () => { const keep = {b: $("#cdBrand", m).value, s: $("#cdSize", m).value, p: $("#cdPrice", m).value, l: $("#cdLine", m).value};
+  const redraw = () => { const wb = $("#cdWithBrand", m).checked; d.no_brand = !wb; const keep = {b: $("#cdBrand", m).value, s: $("#cdSize", m).value, p: $("#cdPrice", m).value, l: $("#cdLine", m).value};
     box.innerHTML = draw(); $("#cdBrand", m).value = keep.b; $("#cdSize", m).value = keep.s; $("#cdPrice", m).value = keep.p; $("#cdLine", m).value = keep.l; showTpl(); };
   const showTpl = () => { const l = d.lines.find(x => x.id === $("#cdLine", m).value); $("#cdTpl", m).textContent = l ? (l.template_label || "—") : "—"; };
   m.addEventListener("change", e => { if(e.target.id === "cdLine") showTpl(); });

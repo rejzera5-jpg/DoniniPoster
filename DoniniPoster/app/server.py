@@ -892,6 +892,11 @@ def create_app(engine):
         for k in ("size", "code", "brand"):
             if k in data and data[k] is not None:
                 p[k] = str(data[k]).strip()
+        if "no_brand" in data:
+            if data["no_brand"]:
+                p["no_brand"] = True
+            else:
+                p.pop("no_brand", None)
         if "price" in data:
             try:
                 p["price"] = float(str(data["price"]).replace(",", "."))
@@ -956,7 +961,7 @@ def create_app(engine):
         types = {t["id"]: t["label"] for t in list_types(engine.cfg.get("custom_templates", []))}
         names = {s["id"]: s["name"] for s in C.load_sites()}
         return {"id": p["id"], "code": p.get("code"), "name": p.get("name"), "size": p.get("size", ""), "price": p.get("price"),
-                "brand": brand_of_product(p), "brand_manual": bool((p.get("brand") or "").strip()),
+                "brand": brand_of_product(p), "brand_manual": bool((p.get("brand") or "").strip()), "no_brand": bool(p.get("no_brand")),
                 "line": p.get("line"), "line_name": line.get("name", ""), "template": line.get("template", ""),
                 "template_label": types.get(line.get("template", ""), line.get("template", "")),
                 "lines": [{"id": l["id"], "name": l["name"], "template_label": types.get(l.get("template", ""), "")}
@@ -998,13 +1003,17 @@ def create_app(engine):
                     raise HTTPException(400, "Цена — число")
             elif act == "size":
                 p["size"] = str(val or "").strip()
+            elif act == "brand_on":
+                p.pop("no_brand", None)
+            elif act == "brand_off":
+                p["no_brand"] = True
             elif act == "top":  # выставить первыми
                 p["added"] = f"2000-01-01T00:00:{n:02d}"
             else:
                 raise HTTPException(400, "Неизвестное действие")
             n += 1
         engine.save()
-        engine.log(f"✔ Выбранные товары ({n}): {({'retry': 'повтор ошибок', 'line': 'перенесены в другой вид', 'price': 'новая цена', 'size': 'новый размер', 'top': 'выставляются первыми'}).get(act, act)}")
+        engine.log(f"✔ Выбранные товары ({n}): {({'retry': 'повтор ошибок', 'line': 'перенесены в другой вид', 'price': 'новая цена', 'size': 'новый размер', 'top': 'выставляются первыми', 'brand_on': 'с брендом', 'brand_off': 'без бренда'}).get(act, act)}")
         return {"ok": True, "done": n}
 
     # ---------- свой текст товара (перед выгрузкой) ----------
