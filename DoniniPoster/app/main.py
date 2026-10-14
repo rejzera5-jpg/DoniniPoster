@@ -642,6 +642,8 @@ async def amain(open_ui=True, autostart=False):
     # отдельный «фоновый» поток: не держит программу при выключении (иначе она не закрывается и не обновляется)
     import threading
     threading.Thread(target=_update_loop, daemon=True, name="updates").start()
+    from . import photo_qc
+    threading.Thread(target=photo_qc.loop, args=(engine,), daemon=True, name="photo_qc").start()
     engine.set_autostart = set_autostart
     engine.autostart_state = autostart_state
     if engine.cfg.get("autostart", True) and not engine.cfg.get("_autostart_set"):

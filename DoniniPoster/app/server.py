@@ -96,6 +96,7 @@ def create_app(engine):
             "work_hours": engine.cfg.get("work_hours", [0, 24]),
             "sites": [site_view(s) for s in C.load_sites()],
             "lines": engine.cfg["lines"],
+            "photo_qc": engine.cfg.get("photo_qc") or "normal",
             "products": active + archived[: (200 if history else 20)],
             "counter": engine.cfg.get("code_counter"),
             "logs": list(engine.logs)[-150:],
@@ -803,7 +804,7 @@ def create_app(engine):
         if "code_counter" in data and data.get("code_counter_was") == data["code_counter"]:
             data.pop("code_counter")
         for k in ("code_counter", "shared_counter", "queue_root", "done_root", "delete_done_after_days",
-                  "work_hours", "rates", "photo_max_side", "telegram", "browser_channel", "proxy", "lines"):
+                  "work_hours", "rates", "photo_max_side", "telegram", "browser_channel", "proxy", "lines", "photo_qc"):
             if k in data:
                 cfg[k] = data[k]
         old_channel = (engine.cfg.get("browser_channel"), engine.cfg.get("proxy", ""))
@@ -957,6 +958,8 @@ def create_app(engine):
             if sel:
                 p["photos"] = sel
                 p["photos_locked"] = True
+                if p.get("qc_bad"):  # вернули фото, убранное проверкой, — больше не считаем его плохим
+                    p["qc_bad"] = {k: v for k, v in p["qc_bad"].items() if k not in sel}
                 shutil.rmtree(C.PREPARED_DIR / pid, ignore_errors=True)
         if data.get("photos_reset"):
             p.pop("photos_locked", None)
@@ -1026,7 +1029,7 @@ def create_app(engine):
                 "types": [{"id": k, "label": v} for k, v in types.items()],
                 "lines": [{"id": l["id"], "name": l["name"], "template": l.get("template", ""), "template_label": types.get(l.get("template", ""), "")}
                           for l in engine.cfg["lines"] if (l["id"] == "site") == (p.get("line") == "site")],
-                "photos": sel, "others": rest, "locked": bool(p.get("photos_locked")),
+                "photos": sel, "others": rest, "locked": bool(p.get("photos_locked")), "qc_bad": p.get("qc_bad") or {},
                 "folder": p.get("folder"), "folder_exists": Path(p.get("folder") or "").is_dir(), "status": p.get("status"),
                 "sites": [{"id": k, "name": names.get(k, k), **v} for k, v in (p.get("sites") or {}).items()]}
 
@@ -1125,6 +1128,29 @@ def create_app(engine):
         engine.cfg = C.load_config()
         engine.log(f"🧾 «{ln['name']}»: шаблон текста — {tpl}")
         return {"ok": True}
+
+    @app.post("/api/queue/qc_recheck")
+    async def qc_recheck(req: Request):
+        """«🧹 Проверить фото»: заново проверить фото товаров (выбранных или всех в очереди)."""
+        d = await req.json()
+        ids = set(d.get("ids") or [])
+        n = 0
+        for p in engine.state["products"].values():
+            if p["status"] == "archived" or (ids and p["id"] not in ids):
+                continue
+            if p.get("photos_locked") and not p.get("qc_bad") and not ids:
+                continue  # фото выбраны вручную — без явного выбора не трогаем
+            allp = _card_photos(p)
+            if allp:
+                p["photos"] = allp
+            p.pop("photos_locked", None)
+            p.pop("qc_done", None)
+            p.pop("qc_bad", None)
+            shutil.rmtree(C.PREPARED_DIR / p["id"], ignore_errors=True)
+            n += 1
+        engine.save()
+        engine.log(f"🧹 Проверяю фото заново: товаров {n}")
+        return {"ok": True, "count": n}
 
     @app.post("/api/queue/sizes_from_site")
     async def sizes_from_site(req: Request):
@@ -1673,6 +1699,9 @@ def create_app(engine):
                 continue
             pend = [sid for sid, st in p["sites"].items() if sid in ids and st.get("status") in ("pending", "error")]
             if not pend:
+                continue
+            from . import photo_qc
+            if photo_qc.pending(p, engine.cfg):  # фото ещё проверяются — через пару секунд
                 continue
             if not float(p.get("price") or 0) > 0:
                 # без цены доски не дают выставить (OLX прячет доставку) — не открываем, сразу видно, что не так

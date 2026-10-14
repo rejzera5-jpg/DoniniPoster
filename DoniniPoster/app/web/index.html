@@ -79,6 +79,9 @@
   .chip.done{background:var(--ok-soft);color:var(--ok);cursor:pointer}
   .brandtg{padding:1px 7px;font-size:11px;margin-left:4px;border-radius:10px}
   .brandstrip{margin-top:6px;align-items:center}
+  .qcwhy{position:absolute;left:4px;right:4px;bottom:4px;font-size:10px;line-height:1.2;background:rgba(200,40,40,.85);color:#fff;border-radius:6px;padding:2px 4px}
+  .qcbadge{color:var(--warn, #d9a441)}
+  #qcLevel{font-size:12px;padding:2px 6px}
   input.noprice{border-color:var(--err);background:var(--err-soft)}
   input.noprice::placeholder{color:var(--err)}
   .chip.brandsite{cursor:pointer;border:1px solid transparent;font:inherit;font-size:12px}
@@ -314,6 +317,10 @@
       </span></h3>
     <div id="siteStrip" class="chips"></div>
     <div id="brandStrip" class="chips brandstrip"></div>
+    <div class="chips brandstrip"><span class="small muted">🧹 Плохие фото (битые, недокачанные, замыленные, повторы):</span>
+      <select id="qcLevel" title="Программа сама проверяет фото каждого нового товара и не ставит плохие в объявление. Файлы не удаляются — в карточке товара их можно вернуть.">
+        <option value="normal">убирать</option><option value="soft">убирать только явно плохие</option><option value="strict">убирать строже</option><option value="off">не проверять</option></select>
+      <button class="sm" id="qcAll" title="Проверить фото всех товаров в очереди заново">🧹 Проверить всю очередь</button></div>
     <div id="bulkBoards"></div>
     <div id="qBoards"></div>
   </div>
@@ -814,6 +821,7 @@ function renderQueue(siteMode){
   if(editing(siteMode ? "qSite" : "qBoards")) return;
   if(!siteMode){
     setHTML($("#siteStrip"), siteChips(S.sites.filter(s => s.enabled && s.id !== "doninisklep")));
+    if(document.activeElement !== $("#qcLevel")) $("#qcLevel").value = (S.photo_qc || "normal");
     // бренд в объявлении — отдельно для каждого сайта (нажать — переключить)
     const bs = S.sites.filter(s => s.enabled && s.id !== "doninisklep");
     setHTML($("#brandStrip"), bs.length ? `<span class="small muted">Бренд в объявлении:</span>` + bs.map(s => `<button class="chip brandsite ${s.title_brand ? "on" : "off"}" data-brandsite="${esc(s.id)}"
@@ -857,7 +865,7 @@ function renderQueue(siteMode){
         <td style="max-width:340px"><a data-act="card" data-pid="${p.id}" style="cursor:pointer">${esc(p.name)}</a>
           <div class="small muted">${esc(lines[p.line]?.name || p.line)} · ${archived ? `🧾 ${esc(tplLabel(effTpl(p)))}` : `<select class="tplsel${p.template ? " own" : ""}" data-tpl="${p.id}" title="Шаблон текста объявления для этого товара">
               <option value="">🧾 ${esc(tplLabel(lines[p.line]?.template))} — как у «${esc(lines[p.line]?.name || "")}»</option>
-              ${(META.types || []).filter(t => t.id !== lines[p.line]?.template).map(t => `<option value="${esc(t.id)}" ${t.id === p.template ? "selected" : ""}>🧾 ${esc(t.label)}${t.custom ? " (свой)" : ""}</option>`).join("")}</select>`} · ${p.photos.length} фото${p.photos_locked ? " · фото выбраны" : ""}${p.texts && Object.keys(p.texts).length ? ` · <span class="warn" title="Текст поправлен вручную — шаблон к нему не применяется. «↺ Тексты по шаблону» — вернуть шаблон">✏️ свой текст</span>` : ""}
+              ${(META.types || []).filter(t => t.id !== lines[p.line]?.template).map(t => `<option value="${esc(t.id)}" ${t.id === p.template ? "selected" : ""}>🧾 ${esc(t.label)}${t.custom ? " (свой)" : ""}</option>`).join("")}</select>`} · ${p.photos.length} фото${p.qc_bad && Object.keys(p.qc_bad).length ? ` · <span class="qcbadge" title="${esc(Object.entries(p.qc_bad).map(([f, r]) => f.split(/[\\/]/).pop() + ": " + r).join("\n"))}">🧹 убрано плохих фото: ${Object.keys(p.qc_bad).length}</span>` : p.photos_locked ? " · фото выбраны" : ""}${p.texts && Object.keys(p.texts).length ? ` · <span class="warn" title="Текст поправлен вручную — шаблон к нему не применяется. «↺ Тексты по шаблону» — вернуть шаблон">✏️ свой текст</span>` : ""}
             ${archived ? (p.no_brand ? " · без бренда" : "") : `<button class="sm brandtg ${p.no_brand ? "off" : "on"}" data-act="brand" data-pid="${p.id}" title="${p.no_brand ? "Этот товар — БЕЗ бренда на всех сайтах. Нажмите — включить бренд (на сайтах с 🏷)" : "С брендом на: " + (Object.keys(p.sites).filter(k => sites[k] && sites[k].title_brand && k !== "doninisklep").map(k => sites[k].name).join(", ") || "— ни на одном (включите 🏷 у сайта сверху)") + ". Нажмите — этот товар везде без бренда"}">${p.no_brand ? "🚫 без бренда" : "🏷 с брендом" + (p.brand ? ": " + esc(p.brand) : "")}</button>`}</div></td>
         <td>${archived ? esc(p.size) : `<input class="mini" data-edit="size" data-pid="${p.id}" value="${esc(p.size)}">`}</td>
         <td>${archived ? esc(p.price) : `<input class="tiny${!(+p.price > 0) ? " noprice" : ""}" data-edit="price" data-pid="${p.id}" value="${esc(p.price || "")}" ${!(+p.price > 0) ? `placeholder="цена!" title="Нет цены — без неё товар на доски не пойдёт"` : ""}>`}</td>
@@ -874,6 +882,8 @@ function renderQueue(siteMode){
 $$(".showHistory").forEach(c => c.onchange = (e) => { showHist = e.target.checked; $$(".showHistory").forEach(x => x.checked = showHist); refresh(); });
 $("#qLineFilter").onchange = () => render(true);
 $("#qStateFilter").onchange = () => render(true);
+$("#qcLevel").onchange = async (e) => { e.target.blur(); await post("/api/config", {photo_qc: e.target.value}); toast(e.target.value === "off" ? "Проверка фото выключена" : "🧹 Проверка фото: " + e.target.selectedOptions[0].textContent); };
+$("#qcAll").onclick = async () => { if(!confirm("Проверить фото всех товаров в очереди заново?\n\nФото, которые вы выбрали вручную в карточке, не трогаются.")) return; const r = await post("/api/queue/qc_recheck", {}); toast(`🧹 Проверяю фото: ${r.count} товаров`); setTimeout(refresh, 5000); };
 $("#brandStrip").addEventListener("click", async e => {
   const b = e.target.closest("[data-brandsite]"); if(!b) return;
   const s = S.sites.find(x => x.id === b.dataset.brandsite); if(!s) return;
@@ -1838,6 +1848,7 @@ function renderBulk(siteMode, rows){
     <button class="sm" data-bulk="price">💰 Цена…</button>
     <button class="sm" data-bulk="size">📏 Размер…</button>
     <select data-bulksel="template"><option value="">🧾 Шаблон текста…</option><option value="__line">как у вида товара</option>${tplOpts("")}</select>
+    <button class="sm" data-bulk="qc" title="Проверить фото выбранных товаров заново (битые, недокачанные, замыленные, повторы)">🧹 Проверить фото</button>
     <button class="sm" data-bulk="texts_reset" title="Убрать свои тексты (✏️) — снова текст из шаблона">↺ Текст по шаблону</button>
     <button class="sm" data-bulk="brand_on" title="Выбранные товары — с брендом">🏷 С брендом</button>
     <button class="sm" data-bulk="brand_off" title="Выбранные товары — без бренда (бренд не пишется нигде)">🚫 Без бренда</button>
@@ -1848,6 +1859,7 @@ async function doBulk(action, value){
   const ids = [...SEL];
   if(!ids.length) return;
   if(action === "clear"){ SEL.clear(); render(true); return; }
+  if(action === "qc"){ const r = await post("/api/queue/qc_recheck", {ids}); toast(`🧹 Проверяю фото: ${r.count} товаров — через несколько секунд будет видно, что убрано`); setTimeout(refresh, 4000); return; }
   if(action === "remove" && !confirm(`Убрать из очереди выбранные товары (${ids.length})?\n\nПапки переносятся в «_удалено» — их можно вернуть.`)) return;
   if(action === "price"){ value = prompt(`Новая цена (зл) для ${ids.length} товаров:`); if(!value) return; }
   if(action === "size"){ value = prompt(`Новый размер для ${ids.length} товаров (например 30x20x10):`); if(value === null) return; }
@@ -1880,6 +1892,7 @@ async function cardModal(pid){
   const ST = {done:"✓ выставлен", error:"ошибка", pending:"ждёт", running:"выставляет", skipped:"пропущен"};
   const ph = (list, isOff) => list.map((x, i) => `<div class="ph ${!isOff && i === 0 ? "main" : ""}" draggable="${!isOff}" data-i="${i}" data-off="${isOff ? 1 : 0}">
       <img loading="lazy" src="/api/thumb?path=${encodeURIComponent(x)}">
+      ${isOff && d.qc_bad && d.qc_bad[x] ? `<span class="qcwhy" title="Убрано автоматически">🧹 ${esc(d.qc_bad[x])}</span>` : ""}
       ${isOff ? `<span class="n" style="cursor:pointer">+ вернуть</span>` : `<span class="n">${i === 0 ? "⭐ главное" : i + 1}</span>
       <div class="bt"><button data-ph="left" title="Левее">◀</button><button data-ph="main" title="Сделать главным">⭐</button><button data-ph="right" title="Правее">▶</button><button data-ph="off" title="Не использовать">✕</button></div>`}</div>`).join("");
   const draw = () => `
