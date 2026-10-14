@@ -79,6 +79,8 @@
   .chip.done{background:var(--ok-soft);color:var(--ok);cursor:pointer}
   .brandtg{padding:1px 7px;font-size:11px;margin-left:4px;border-radius:10px}
   .brandstrip{margin-top:6px;align-items:center}
+  input.noprice{border-color:var(--err);background:var(--err-soft)}
+  input.noprice::placeholder{color:var(--err)}
   .chip.brandsite{cursor:pointer;border:1px solid transparent;font:inherit;font-size:12px}
   .chip.brandsite.on{background:var(--ok-soft);color:var(--ok);border-color:var(--ok)}
   .chip.brandsite.off{background:var(--err-soft);color:var(--err);border-color:var(--err)}
@@ -857,7 +859,7 @@ function renderQueue(siteMode){
               ${(META.types || []).filter(t => t.id !== lines[p.line]?.template).map(t => `<option value="${esc(t.id)}" ${t.id === p.template ? "selected" : ""}>🧾 ${esc(t.label)}${t.custom ? " (свой)" : ""}</option>`).join("")}</select>`} · ${p.photos.length} фото${p.photos_locked ? " · фото выбраны" : ""}${p.texts && Object.keys(p.texts).length ? ` · <span class="warn" title="Текст поправлен вручную — шаблон к нему не применяется. «↺ Тексты по шаблону» — вернуть шаблон">✏️ свой текст</span>` : ""}
             ${archived ? (p.no_brand ? " · без бренда" : "") : `<button class="sm brandtg ${p.no_brand ? "off" : "on"}" data-act="brand" data-pid="${p.id}" title="${p.no_brand ? "Этот товар — БЕЗ бренда на всех сайтах. Нажмите — включить бренд (на сайтах с 🏷)" : "С брендом на: " + (Object.keys(p.sites).filter(k => sites[k] && sites[k].title_brand && k !== "doninisklep").map(k => sites[k].name).join(", ") || "— ни на одном (включите 🏷 у сайта сверху)") + ". Нажмите — этот товар везде без бренда"}">${p.no_brand ? "🚫 без бренда" : "🏷 с брендом" + (p.brand ? ": " + esc(p.brand) : "")}</button>`}</div></td>
         <td>${archived ? esc(p.size) : `<input class="mini" data-edit="size" data-pid="${p.id}" value="${esc(p.size)}">`}</td>
-        <td>${archived ? esc(p.price) : `<input class="tiny" data-edit="price" data-pid="${p.id}" value="${esc(p.price || "")}">`}</td>
+        <td>${archived ? esc(p.price) : `<input class="tiny${!(+p.price > 0) ? " noprice" : ""}" data-edit="price" data-pid="${p.id}" value="${esc(p.price || "")}" ${!(+p.price > 0) ? `placeholder="цена!" title="Нет цены — без неё товар на доски не пойдёт"` : ""}>`}</td>
         <td><div class="chips">${chips}</div></td>
         <td style="white-space:nowrap;text-align:right">${archived ? `<span class="small muted">готово</span>` : `
           ${hasErr ? `<button class="sm primary" data-act="retry" data-pid="${p.id}">Повторить</button>` : ""}

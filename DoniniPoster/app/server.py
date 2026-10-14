@@ -17,6 +17,9 @@ from .templates import (ALL_LANGS, LANG_NAMES, build_texts, convert_price, decod
 WEB = Path(__file__).parent / "web"
 
 
+NO_PRICE = "Нет цены — впишите цену в очереди (без цены OLX и другие доски не дают выставить)"
+
+
 def create_app(engine):
     app = FastAPI(title="Donini Poster")
     # помощник в вашем браузере (olx.pl и т.д.) обращается к программе на этом компьютере
@@ -939,6 +942,7 @@ def create_app(engine):
                 p["price"] = float(str(data["price"]).replace(",", "."))
             except ValueError:
                 pass
+            _price_ok(p)
         if data.get("line") and data["line"] != p.get("line"):
             from .queue_store import set_line
             ln = next((l for l in engine.cfg["lines"] if l["id"] == data["line"]), None)
@@ -968,6 +972,12 @@ def create_app(engine):
                     st["status"] = "pending"
         engine.save()
         return {"ok": True}
+
+    def _price_ok(p):
+        if float(p.get("price") or 0) > 0:
+            for st in (p.get("sites") or {}).values():
+                if st.get("status") == "error" and st.get("error") == NO_PRICE:
+                    st.update(status="pending", error=None)
 
     def _set_tpl(p, tpl):
         from .templates import list_types
@@ -1051,6 +1061,7 @@ def create_app(engine):
                     p["price"] = float(str(val).replace(",", "."))
                 except ValueError:
                     raise HTTPException(400, "Цена — число")
+                _price_ok(p)
             elif act == "size":
                 p["size"] = str(val or "").strip()
             elif act == "template":
@@ -1607,18 +1618,30 @@ def create_app(engine):
     async def ext_state():
         sites = ext_sites()
         ids = {s["id"]: s for s in sites}
-        prods = []
+        prods, noprice = [], []
         for p in sorted(engine.state["products"].values(), key=lambda x: x["added"]):
             if p["status"] == "archived":
                 continue
             pend = [sid for sid, st in p["sites"].items() if sid in ids and st.get("status") in ("pending", "error")]
             if not pend:
                 continue
+            if not float(p.get("price") or 0) > 0:
+                # без цены доски не дают выставить (OLX прячет доставку) — не открываем, сразу видно, что не так
+                for sid in pend:
+                    st = p["sites"][sid]
+                    if st.get("error") != NO_PRICE:
+                        st.update(status="error", error=NO_PRICE)
+                        noprice.append(p.get("code"))
+                continue
             line = p["line"]
             prods.append({"id": p["id"], "code": p["code"], "name": p["name"], "size": p.get("size", ""), "line": line,
                           "price": p.get("price"), "photos": len(p["photos"]),
                           "thumb": "/api/thumb?path=" + __import__("urllib.parse").parse.quote(p["photos"][0]) if p["photos"] else "",
                           "sites": [{"id": sid, "name": ids[sid]["name"], "has_steps": bool(engine.scenario_for(ids[sid], line))} for sid in pend]})
+        if noprice:
+            engine.save()
+            codes = sorted(set(noprice))
+            engine.log(f"⚠️ Нет цены у товаров {', '.join(codes[:10])}{' …' if len(codes) > 10 else ''} — на доски не пойдут, пока не впишете цену")
         in_lines = {sid for l in engine.cfg["lines"] for sid in l.get("sites", [])}
         missing = [s["name"] for s in sites if s["id"] not in in_lines]
         disabled = [s["name"] for s in C.load_sites() if s.get("type") in ("ext", "manual") and not s.get("enabled")]
