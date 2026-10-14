@@ -6,6 +6,7 @@
 сценарии, очередь) и папки очереди не трогаются."""
 import json
 import shutil
+import urllib.parse
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -56,7 +57,7 @@ def _branch_info(repo):
     raw = f"https://raw.githubusercontent.com/{repo}/{BRANCH}/DoniniPoster"
     latest = _get(f"{raw}/app/VERSION", timeout=20).decode("utf-8", "replace").strip()
     try:
-        notes = _get(f"{raw}/ЧТО_НОВОГО.txt", timeout=20).decode("utf-8", "replace").strip()
+        notes = _get(f"{raw}/" + urllib.parse.quote("ЧТО_НОВОГО.txt"), timeout=20).decode("utf-8", "replace").strip()
     except Exception:
         notes = ""
     return {"latest": latest, "notes": notes[:2000],
