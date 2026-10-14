@@ -330,7 +330,8 @@
     <div class="row">
       <span class="small muted" style="flex:1">Нажмите на товар — он скачается в очередь (можно нажимать подряд). ✓ — уже скачан раньше.</span>
       <button class="sm" id="catReload" title="Подтянуть новые товары с сайта (делается само при открытии раздела и раз в 2 минуты)">⟳ Обновить с сайта</button>
-      <button class="sm go" id="catAll">⬇ Все на странице</button>
+      <button class="sm" id="catAll" title="Только товары, которые сейчас видны на странице">⬇ Все на странице</button>
+      <button class="sm go" id="catAllF" title="Все товары сайта с выбранной категорией, брендом и поиском — со всех страниц">⬇ Скачать все по фильтру</button>
       <button class="stop sm hidden" id="pullStop">■ Стоп</button>
     </div>
     <div id="catProg" class="hidden"><div class="row"><b id="catProgT">⬇ Скачиваю…</b><span class="spacer"></span><button class="sm" data-goto="boards">Открыть очередь →</button></div><div class="pbar"><i id="catProgBar" style="width:0%"></i></div></div>
@@ -1528,6 +1529,7 @@ $("#szShops").addEventListener("click", async e => {
 $("#szOpen").onclick = () => { if(!EXT.ok) return alert("Расширение в браузере не отвечает."); ext({type:"openTab", url:"https://www.szwego.com/"}); };
 let CAT = {page: 1, items: [], cat: "", running: new Set()};
 async function catLoad(reset){
+  try{ catAllFLabel(); }catch(e){}
   if(reset){ CAT.page = 1; CAT.items = []; }
   const q = new URLSearchParams({category: CAT.cat, brand: $("#catBrand").value, search: $("#catSearch").value.trim(), page: CAT.page});
   $("#catMore").classList.add("hidden");
@@ -1573,6 +1575,30 @@ $("#catGrid").addEventListener("click", e => {
   if(p.pulled && !confirm("Этот товар уже скачивали. Скачать ещё раз?")) return;
   catPull([p.id]);
 });
+// все товары по фильтру (например все сумки Gucci) — со всех страниц каталога, одной кнопкой
+function catFilterName(){
+  const cat = CAT.cat ? (($("#catCats [data-cat].sel") || {}).textContent || "").replace(/\s*·.*$/, "") : "";
+  const br = $("#catBrand").value ? $("#catBrand").selectedOptions[0].textContent.replace(/\s*\(\d+\)$/, "") : "";
+  const q = $("#catSearch").value.trim();
+  return [br, cat, q && `«${q}»`].filter(Boolean).join(" · ") || "весь каталог";
+}
+function catAllFLabel(){ $("#catAllF").textContent = `⬇ Скачать все: ${catFilterName()}`; }
+$("#catAllF").onclick = async () => {
+  const b = $("#catAllF"); b.disabled = true; const old = b.textContent; b.textContent = "Считаю товары…";
+  let r;
+  try{ r = await api("/api/woo/catalog_ids?" + new URLSearchParams({category: CAT.cat, brand: $("#catBrand").value, search: $("#catSearch").value.trim()})); }
+  catch(e){ return; }  // ошибку уже показали
+  finally{ b.disabled = false; b.textContent = old; }
+  const name = catFilterName();
+  if(!r.total) return alert(`${name}: товаров с фото нет.`);
+  if(!r.new.length){
+    if(!confirm(`${name}: все ${r.total} товаров уже скачаны в очередь раньше.\n\nСкачать их ещё раз?`)) return;
+    return catPull(r.ids);
+  }
+  const skip = r.total - r.new.length;
+  if(!confirm(`${name}: ${r.total} товаров на сайте${skip ? `, из них ${skip} уже скачаны раньше — их пропущу` : ""}.\n\nСкачать в очередь ${r.new.length} товаров?`)) return;
+  catPull(r.new);
+};
 $("#catAll").onclick = () => { const ids = CAT.items.filter(p => !p.pulled).map(p => p.id); if(!ids.length) return alert("На странице всё уже скачано."); if(confirm(`Скачать в очередь ${ids.length} товаров?`)) catPull(ids); };
 $("#catMore").onclick = () => { CAT.page++; catLoad(false); };
 $("#catReload").onclick = () => catRefresh(true);

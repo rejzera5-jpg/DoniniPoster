@@ -232,6 +232,41 @@ def create_app(engine):
         except Exception as e:
             raise HTTPException(400, f"Сайт не подключён: {e}")
 
+    @app.get("/api/woo/catalog_ids")
+    async def woo_catalog_ids(category: str = "", brand: str = "", search: str = ""):
+        """Все товары сайта по фильтру (категория + бренд + поиск) — для кнопки «Скачать все»."""
+        from . import sources
+        try:
+            woo = _woo_mod().Woo(engine.cfg)
+        except Exception as e:
+            raise HTTPException(400, f"Сайт не подключён: {e}")
+
+        def get():
+            params = {"status": "publish", "orderby": "date", "order": "desc", "per_page": 100, "_fields": "id,images"}
+            if category:
+                params["category"] = category
+            if search:
+                params["search"] = search
+            if brand:
+                a = _brand_attr(woo)
+                if a:
+                    params["attribute"] = a.get("slug") or f"pa_{a['id']}"
+                    params["attribute_term"] = brand
+            out = []
+            for page in range(1, 31):  # до 3000 товаров
+                chunk = woo.wc("products", params={**params, "page": page}) or []
+                out += chunk
+                if len(chunk) < 100:
+                    break
+            return out
+        try:
+            prods = await asyncio.to_thread(get)
+        except Exception as e:
+            raise HTTPException(400, f"Сайт doninisklep.com сейчас не отвечает — подождите минуту ({str(e)[:80]})")
+        pulled = sources.pulled_ids()
+        ids = [p["id"] for p in prods if p.get("images")]
+        return {"total": len(ids), "ids": ids, "new": [i for i in ids if str(i) not in pulled]}
+
     @app.get("/api/woo/catalog")
     async def woo_catalog(category: str = "", brand: str = "", search: str = "", page: int = 1):
         from . import sources
