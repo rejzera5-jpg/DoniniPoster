@@ -1,0 +1,184 @@
+{
+  "enabled": false,
+  "type": "ext",
+  "plugin": "",
+  "min_interval_min": 10,
+  "jitter_pct": 30,
+  "daily_limit": 60,
+  "max_photos": 8,
+  "title_spaces": 0,
+  "confirm_before_publish": false,
+  "scenarios": {
+    "default": [
+      {
+        "action": "goto",
+        "label": "открыть сайт",
+        "url": "https://www.olx.pt/"
+      },
+      {
+        "action": "click",
+        "label": "Anunciar e Vender",
+        "selectors": [
+          "[data-testid=\"post-new-ad-button\"]",
+          "[data-cy=\"post-new-ad-button\"]",
+          "a:has-text(\"Anunciar e Vender\")",
+          "text=\"Anunciar e Vender\"",
+          "#hydrate-root > header > div > div > a:nth-of-type(2)"
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Não, recomeçar",
+        "selectors": [
+          "button:has-text(\"Não, recomeçar\")",
+          "text=\"Não, recomeçar\"",
+          "html > body > div:nth-of-type(9) > div > div > div:nth-of-type(3) > button:nth-of-type(2)"
+        ]
+      },
+      {
+        "action": "fill",
+        "label": "Название",
+        "selectors": [
+          "#title",
+          "input[name=\"title\"]",
+          "input[placeholder=\"p\\.\\ ex\\.\\ “Autocaravana\\ Fiat\\ Ducato”\"]"
+        ],
+        "value": "{title}"
+      },
+      {
+        "action": "upload",
+        "label": "фото",
+        "multiple": true,
+        "selectors": [
+          "button:has-text(\"Continuar\")",
+          "text=\"Continuar\"",
+          "#posting-form > main > div > div > section > div:nth-of-type(2) > div > button:nth-of-type(2)",
+          "[data-testid=\"attach-photos-input\"]",
+          "[data-cy=\"attach-photos-input\"]",
+          "#\\30 "
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Selecionar",
+        "selectors": [
+          "input[placeholder=\"Selecionar\"]",
+          "div > div:nth-of-type(1) > div:nth-of-type(3) > div > div > div > div > input"
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Novo com etiqueta",
+        "selectors": [
+          "a:has-text(\"Novo com etiqueta\")",
+          "text=\"Novo com etiqueta\"",
+          "html > body > div:nth-of-type(14) > div > div > button:nth-of-type(1) > div > a"
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Selecionar",
+        "selectors": [
+          "input[placeholder=\"Selecionar\"]",
+          "div > div:nth-of-type(1) > div:nth-of-type(4) > div > div > div > div > input"
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Outras Marcas",
+        "selectors": [
+          "a:has-text(\"Outras Marcas\")",
+          "text=\"Outras Marcas\"",
+          "html > body > div:nth-of-type(15) > div > div > button:nth-of-type(43) > div > a"
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Selecionar",
+        "selectors": [
+          "input[placeholder=\"Selecionar\"]",
+          "div > div:nth-of-type(1) > div:nth-of-type(5) > div > div > div > div > input"
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Mochilas",
+        "selectors": [
+          "a:has-text(\"Mochilas\")",
+          "text=\"Mochilas\"",
+          "html > body > div:nth-of-type(16) > div > div > button:nth-of-type(13) > div > a"
+        ]
+      },
+      {
+        "action": "fill",
+        "label": "Цена",
+        "selectors": [
+          "[data-testid=\"price-input\"]",
+          "[data-cy=\"posting-price\"]",
+          "#parameters\\.price\\.price",
+          "input[name=\"parameters\\.price\\.price\"]"
+        ],
+        "value": "{price}"
+      },
+      {
+        "action": "fill",
+        "label": "Описание",
+        "selectors": [
+          "[data-testid=\"posting-description-text-area\"]",
+          "#description",
+          "textarea[name=\"description\"]",
+          "textarea[placeholder=\"Escreve\\ o\\ que\\ gostarias\\ de\\ ler\\ se\\ fosses\\ tu\\ a\\ ver\\ este\\ anúncio\"]"
+        ],
+        "value": "{body}"
+      },
+      {
+        "action": "check",
+        "alt": [],
+        "label": "false",
+        "selectors": [
+          "[data-cy=\"courier\"]",
+          "#nexus-input",
+          "input[name=\"courier\"]"
+        ],
+        "value": false
+      },
+      {
+        "action": "click",
+        "label": "Particular",
+        "selectors": [
+          "[data-testid=\"private_business_private_unactive\"]",
+          "[data-cy=\"private_business_private\"]",
+          "button:has-text(\"Particular\")",
+          "text=\"Particular\"",
+          "div:nth-of-type(6) > div:nth-of-type(3) > div > div:nth-of-type(1) > div > div > div > button:nth-of-type(1)"
+        ]
+      },
+      {
+        "action": "check",
+        "alt": [
+          "label:has-text(\"Autoprolongar\")",
+          "main > div:nth-of-type(1) > div:nth-of-type(5) > div > div:nth-of-type(1) > div > div > label"
+        ],
+        "label": "Autoprolongar O anúncio será prolongado automaticamente semp",
+        "selectors": [
+          "#auto-extension"
+        ],
+        "value": true
+      },
+      {
+        "action": "publish",
+        "label": "Publicar anúncio",
+        "selectors": [
+          "[data-testid=\"submit-btn\"]",
+          "button:has-text(\"Publicar anúncio\")",
+          "text=\"Publicar anúncio\"",
+          "#posting-form > main > div:nth-of-type(1) > div:nth-of-type(8) > div > button:nth-of-type(2)"
+        ]
+      }
+    ]
+  },
+  "id": "olx_pt",
+  "name": "OLX.pt",
+  "lang": "PT",
+  "start_url": "https://www.olx.pt/"
+}

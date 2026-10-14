@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<style>
+  body{margin:0;width:360px;font:13px "Segoe UI",system-ui,sans-serif;background:#f6f3ee;color:#241f19}
+  @media (prefers-color-scheme: dark){ body{background:#17130f;color:#f1e9dd} .card{background:#201a14!important;border-color:#3a3025!important} .muted{color:#ab9d8c!important} select,input{background:#271f18!important;color:#f1e9dd!important;border-color:#3a3025!important} button.s{background:#271f18!important;color:#f1e9dd!important;border-color:#3a3025!important} }
+  header{padding:12px 14px;display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:15px}
+  .card{margin:0 12px 10px;padding:12px;border:1px solid #e3dbcd;border-radius:12px;background:#fff}
+  .muted{color:#7a7167;font-size:12px}
+  .row{display:flex;gap:8px;align-items:center}
+  img{width:64px;height:64px;object-fit:cover;border-radius:8px;background:#ddd}
+  .code{font-family:Consolas,monospace;font-weight:700;color:#8a5432;font-size:15px}
+  button{font:inherit;border:0;border-radius:9px;padding:9px 12px;cursor:pointer;background:#8a5432;color:#fff;font-weight:600}
+  button.s{background:#fff;color:#241f19;border:1px solid #e3dbcd;font-weight:500}
+  button:disabled{opacity:.5;cursor:default}
+  .sites{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+  .sites label{display:flex;gap:4px;align-items:center;font-size:12px;border:1px solid #e3dbcd;border-radius:999px;padding:3px 8px;cursor:pointer}
+  .w{width:100%;margin-top:6px}
+  select,input{font:inherit;border:1px solid #e3dbcd;border-radius:8px;padding:6px;background:#f0ebe2}
+  .err{color:#b4442f}
+  h4{margin:0 0 8px;font-size:13px}
+  .auto{border-color:#3f7a52!important}
+</style></head>
+<body>
+<header><span>Donini Poster</span><span class="muted" id="left"></span></header>
+<div id="main"><div class="card muted">Подключаюсь к программе…</div></div>
+<script src="popup.js"></script>
+</body></html>

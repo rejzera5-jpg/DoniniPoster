@@ -1,0 +1,152 @@
+{
+  "enabled": false,
+  "type": "ext",
+  "plugin": "",
+  "min_interval_min": 10,
+  "jitter_pct": 30,
+  "daily_limit": 60,
+  "max_photos": 10,
+  "title_spaces": 0,
+  "confirm_before_publish": false,
+  "scenarios": {
+    "default": [
+      {
+        "action": "goto",
+        "label": "открыть сайт",
+        "url": "https://www.milanuncios.com/"
+      },
+      {
+        "action": "click",
+        "label": "Vender",
+        "selectors": [
+          "#ma-NavigationTopNav-ptaButton",
+          "a:has-text(\"Vender\")",
+          "text=\"Vender\""
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Moda y complementos",
+        "selectors": [
+          "button:has-text(\"Moda y complementos\")",
+          "text=\"Moda y complementos\"",
+          "div > div > div > div > ul > li:nth-of-type(7) > article > button"
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Moda mujer",
+        "selectors": [
+          "button:has-text(\"Moda mujer\")",
+          "text=\"Moda mujer\"",
+          "div > div > div:nth-of-type(1) > div > div > ul > li:nth-of-type(1) > button"
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Complementos",
+        "selectors": [
+          "button:has-text(\"Complementos\")",
+          "text=\"Complementos\"",
+          "div:nth-of-type(1) > div > div > ul > li:nth-of-type(1) > ul > li:nth-of-type(2) > button"
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Bolsos",
+        "selectors": [
+          "button:has-text(\"Bolsos\")",
+          "text=\"Bolsos\"",
+          "div > ul > li:nth-of-type(1) > ul > li:nth-of-type(2) > ul > li:nth-of-type(2) > button"
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Selecciónalas de tu ordenador",
+        "selectors": [
+          "label:has-text(\"Selecciónalas de tu ordenador\")",
+          "text=\"Selecciónalas de tu ordenador\"",
+          "div > div > div:nth-of-type(2) > div > div > div > div:nth-of-type(3) > label"
+        ]
+      },
+      {
+        "action": "upload",
+        "label": "фото",
+        "multiple": true,
+        "selectors": [
+          "button:has-text(\"Subir fotos\")",
+          "text=\"Subir fotos\"",
+          "#modal-react-portal > div:nth-of-type(3) > div > footer > div > button",
+          "#sui-MoleculePhotoUploader-id"
+        ]
+      },
+      {
+        "action": "fill",
+        "label": "Название",
+        "selectors": [
+          "#title",
+          "input[name=\"title\"]",
+          "input[placeholder=\"¿Qué\\ vendes\\ u\\ ofreces\\?\"]"
+        ],
+        "value": "{title}"
+      },
+      {
+        "action": "fill",
+        "label": "Описание",
+        "selectors": [
+          "#description",
+          "textarea[name=\"description\"]",
+          "textarea[placeholder=\"Añade\\ información\\ detallada\\ y\\ características\\ concretas\\ de\\ tu\\ anuncio\\.\"]"
+        ],
+        "value": "{body}"
+      },
+      {
+        "action": "click",
+        "label": "",
+        "selectors": [
+          "#itemCondition"
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Sin estrenar Conserva la etiqueta, el ticket y/o el packagin",
+        "selectors": [
+          "li[aria-label=\"Sin\\ estrenar\"]",
+          "li:has-text(\"Sin estrenar\")",
+          "div > div:nth-of-type(5) > div > div:nth-of-type(2) > div > div:nth-of-type(2) > ul > li:nth-of-type(1)"
+        ]
+      },
+      {
+        "action": "fill",
+        "label": "Цена",
+        "selectors": [
+          "#price",
+          "input[name=\"price\"]"
+        ],
+        "value": "{price}"
+      },
+      {
+        "action": "click",
+        "label": "En mano",
+        "selectors": [
+          "button:has-text(\"En mano\")",
+          "text=\"En mano\"",
+          "#form > div:nth-of-type(1) > div > fieldset > div > fieldset:nth-of-type(2) > div > button:nth-of-type(2)"
+        ]
+      },
+      {
+        "action": "publish",
+        "label": "Publicar",
+        "selectors": [
+          "button:has-text(\"Publicar\")",
+          "text=\"Publicar\"",
+          "#form > div:nth-of-type(2) > div:nth-of-type(2) > button:nth-of-type(2)"
+        ]
+      }
+    ]
+  },
+  "id": "milanuncios",
+  "name": "Milanuncios.com",
+  "lang": "ES",
+  "start_url": "https://www.milanuncios.com/"
+}

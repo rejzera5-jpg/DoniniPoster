@@ -1,0 +1,5 @@
+fastapi>=0.110
+uvicorn>=0.29
+playwright>=1.48
+pillow>=10.0
+pillow-heif>=0.16

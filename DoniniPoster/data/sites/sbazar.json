@@ -1,0 +1,145 @@
+{
+  "enabled": false,
+  "type": "ext",
+  "plugin": "",
+  "min_interval_min": 10,
+  "jitter_pct": 30,
+  "daily_limit": 60,
+  "max_photos": 10,
+  "title_spaces": 1,
+  "confirm_before_publish": false,
+  "scenarios": {
+    "default": [
+      {
+        "action": "goto",
+        "label": "открыть сайт",
+        "url": "https://www.sbazar.cz/"
+      },
+      {
+        "action": "click",
+        "label": "Přidat nabídku",
+        "selectors": [
+          "button:has-text(\"Přidat nabídku\")",
+          "text=\"Přidat nabídku\"",
+          "body > astro-island > div:nth-of-type(1) > header > div:nth-of-type(3) > div > div > button"
+        ]
+      },
+      {
+        "action": "fill",
+        "label": "Название",
+        "selectors": [
+          "[data-test=\"input-name\"]",
+          "#P11-0",
+          "input[name=\"name\"]",
+          "input[placeholder=\"Co\\ přesně\\ nabízíte\\?\"]"
+        ],
+        "value": "{title}"
+      },
+      {
+        "action": "upload",
+        "label": "фото",
+        "multiple": true,
+        "selectors": [
+          "div:has-text(\" Nahrát\")",
+          "text=\" Nahrát\"",
+          "astro-island > div > div:nth-of-type(2) > form > div:nth-of-type(2) > div:nth-of-type(2) > div > div",
+          "[data-test=\"media-input\"]",
+          "div > div:nth-of-type(2) > form > div:nth-of-type(2) > div:nth-of-type(2) > div > div > input"
+        ]
+      },
+      {
+        "action": "fill",
+        "label": "Описание",
+        "selectors": [
+          "[data-test=\"input-description\"]",
+          "#P11-1",
+          "textarea[name=\"description\"]",
+          "textarea[placeholder=\"Popište\\ nabídku\"]"
+        ],
+        "value": "{body}"
+      },
+      {
+        "action": "fill",
+        "label": "Цена",
+        "selectors": [
+          "[data-test=\"input-price\"]",
+          "#input-price",
+          "input[name=\"price\"]",
+          "input[placeholder=\"Za\\ kolik\\ zboží\\ prodáváte\\?\"]"
+        ],
+        "value": "{price}"
+      },
+      {
+        "action": "publish",
+        "label": "Zveřejnit",
+        "selectors": [
+          "[data-test=\"offer-form-submit\"]",
+          "button:has-text(\"Zveřejnit\")",
+          "text=\"Zveřejnit\"",
+          "div:nth-of-type(2) > div > main > astro-island > div > div:nth-of-type(2) > form > button"
+        ]
+      }
+    ],
+    "other": [
+      {
+        "action": "goto",
+        "label": "открыть сайт",
+        "url": "https://www.sbazar.cz/"
+      },
+      {
+        "action": "click",
+        "label": "Přidat nabídku",
+        "selectors": [
+          "button:has-text(\"Přidat nabídku\")",
+          "text=\"Přidat nabídku\"",
+          "body > astro-island > div:nth-of-type(1) > header > div:nth-of-type(3) > div > div > button"
+        ]
+      },
+      {
+        "action": "fill",
+        "label": "Название",
+        "selectors": [
+          "[data-test=\"input-name\"]",
+          "#P11-0",
+          "input[name=\"name\"]",
+          "input[placeholder=\"Co\\ přesně\\ nabízíte\\?\"]"
+        ],
+        "value": "{title}"
+      },
+      {
+        "action": "upload",
+        "label": "фото",
+        "multiple": true,
+        "selectors": [
+          "[data-test=\"media-input\"]",
+          "div > div:nth-of-type(2) > form > div:nth-of-type(2) > div:nth-of-type(2) > div > div > input"
+        ]
+      },
+      {
+        "action": "fill",
+        "label": "Описание",
+        "selectors": [
+          "[data-test=\"input-description\"]",
+          "#P11-1",
+          "textarea[name=\"description\"]",
+          "textarea[placeholder=\"Popište\\ nabídku\"]"
+        ],
+        "value": "{body}"
+      },
+      {
+        "action": "publish",
+        "label": "Zveřejnit",
+        "selectors": [
+          "[data-test=\"offer-form-submit\"]",
+          "button:has-text(\"Zveřejnit\")",
+          "text=\"Zveřejnit\"",
+          "div:nth-of-type(2) > div > main > astro-island > div > div:nth-of-type(2) > form > button"
+        ]
+      }
+    ]
+  },
+  "id": "sbazar",
+  "name": "Sbazar.cz",
+  "lang": "CZ",
+  "start_url": "https://www.sbazar.cz/"
+}

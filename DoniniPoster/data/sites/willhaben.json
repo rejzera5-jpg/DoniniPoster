@@ -1,0 +1,16 @@
+{
+  "enabled": false,
+  "type": "ext",
+  "plugin": "",
+  "min_interval_min": 10,
+  "jitter_pct": 30,
+  "daily_limit": 60,
+  "max_photos": 10,
+  "title_spaces": 0,
+  "confirm_before_publish": false,
+  "scenarios": {},
+  "id": "willhaben",
+  "name": "Willhaben.at",
+  "lang": "AT",
+  "start_url": "https://www.willhaben.at/"
+}

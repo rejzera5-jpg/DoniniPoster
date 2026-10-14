@@ -1,0 +1,155 @@
+{
+  "enabled": true,
+  "type": "ext",
+  "plugin": "",
+  "min_interval_min": 10,
+  "jitter_pct": 30,
+  "daily_limit": 60,
+  "max_photos": 8,
+  "title_spaces": 0,
+  "confirm_before_publish": false,
+  "scenarios": {
+    "bags": [
+      {
+        "action": "goto",
+        "label": "открыть сайт",
+        "url": "https://www.olx.pl/"
+      },
+      {
+        "action": "click",
+        "label": "Dodaj ogłoszenie",
+        "selectors": [
+          "[data-testid=\"post-new-ad-button\"]",
+          "[data-cy=\"post-new-ad-button\"]",
+          "a:has-text(\"Dodaj ogłoszenie\")",
+          "text=\"Dodaj ogłoszenie\"",
+          "#hydrate-root > header > div > div > a:nth-of-type(2)"
+        ]
+      },
+      {
+        "action": "click",
+        "optional": true,
+        "timeout": 5000,
+        "label": "Nie, zaczynam od nowa",
+        "selectors": [
+          "button:has-text(\"Nie, zaczynam od nowa\")",
+          "text=\"Nie, zaczynam od nowa\""
+        ]
+      },
+      {
+        "action": "fill",
+        "label": "Название",
+        "selectors": [
+          "#title",
+          "input[name=\"title\"]",
+          "input[placeholder=\"np\\.\\ „Škoda\\ Octavia\\ 2020”\"]"
+        ],
+        "value": "{title}"
+      },
+      {
+        "action": "click",
+        "label": "Dalej",
+        "selectors": [
+          "button:has-text(\"Dalej\")",
+          "text=\"Dalej\"",
+          "#posting-form > main > div > div > section > div:nth-of-type(2) > div > button:nth-of-type(2)"
+        ]
+      },
+      {
+        "action": "upload",
+        "label": "фото",
+        "multiple": true,
+        "selectors": [
+          "[data-testid=\"attach-photos-input\"]",
+          "[data-cy=\"attach-photos-input\"]",
+          "#\\30 "
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Wybierz",
+        "selectors": [
+          "input[placeholder=\"Wybierz\"]",
+          "div > div:nth-of-type(1) > div:nth-of-type(3) > div > div > div > div > input"
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Męskie",
+        "selectors": [
+          "a:has-text(\"Męskie\")",
+          "text=\"Męskie\"",
+          "html > body > div:nth-of-type(12) > div > div > button:nth-of-type(2) > div > a"
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Nowe",
+        "selectors": [
+          "[data-testid=\"parameters\\.state_new_unactive\"]",
+          "[data-cy=\"parameters\\.state_new\"]",
+          "button:has-text(\"Nowe\")",
+          "text=\"Nowe\"",
+          "div > div > div > div:nth-of-type(1) > div:nth-of-type(5) > div > div > button:nth-of-type(2)"
+        ]
+      },
+      {
+        "action": "fill",
+        "label": "Цена",
+        "selectors": [
+          "[data-testid=\"price-input\"]",
+          "[data-cy=\"posting-price\"]",
+          "#parameters\\.price\\.price",
+          "input[name=\"parameters\\.price\\.price\"]"
+        ],
+        "value": "{price}"
+      },
+      {
+        "action": "fill",
+        "label": "Описание",
+        "selectors": [
+          "[data-testid=\"posting-description-text-area\"]",
+          "#description",
+          "textarea[name=\"description\"]",
+          "textarea[placeholder=\"Wpisz\\ te\\ informacje\\,\\ które\\ byłyby\\ ważne\\ dla\\ Ciebie\\ podczas\\ przeglądania\\ takiego\\ ogłoszenia\"]"
+        ],
+        "value": "{body}"
+      },
+      {
+        "action": "check",
+        "alt": [
+          "label:has-text(\"AutoPrzedłużenie\")",
+          "main > div:nth-of-type(1) > div:nth-of-type(5) > div > div:nth-of-type(1) > div > div > label"
+        ],
+        "label": "AutoPrzedłużenie Ogłoszenie będzie automatycznie przedłużane",
+        "selectors": [
+          "#auto-extension"
+        ],
+        "value": true
+      },
+      {
+        "action": "click",
+        "label": "S Płyta CD, pendrive, rękawiczki",
+        "selectors": [
+          "header:has-text(\"S Płyta CD, pendrive, rękawiczki\")",
+          "text=\"S Płyta CD, pendrive, rękawiczki\"",
+          "div:nth-of-type(1) > div:nth-of-type(3) > div > div:nth-of-type(1) > div > div > div > header"
+        ]
+      },
+      {
+        "action": "publish",
+        "label": "Dodaj ogłoszenie",
+        "selectors": [
+          "[data-testid=\"submit-btn\"]",
+          "button:has-text(\"Dodaj ogłoszenie\")",
+          "text=\"Dodaj ogłoszenie\"",
+          "#posting-form > main > div:nth-of-type(1) > div:nth-of-type(9) > div > button:nth-of-type(2)"
+        ]
+      }
+    ]
+  },
+  "id": "olx_pl",
+  "name": "OLX.pl",
+  "lang": "PL",
+  "start_url": "https://www.olx.pl/"
+}

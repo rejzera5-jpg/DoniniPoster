@@ -1,0 +1,2190 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#17130f;color:#f1e9dd}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<script>
+/* Donini Poster: Manager внутри программы — тёмная тема, шаблоны и правки берутся из программы и сохраняются в неё */
+(function(){
+  document.documentElement.dataset.theme = "dark";
+  try {
+    if (localStorage.getItem("plt_customTypes") === null && localStorage.getItem("plt_overrides_v1") === null) {
+      var x = new XMLHttpRequest(); x.open("GET", "/api/manager/data", false); x.send();
+      var d = JSON.parse(x.responseText);
+      localStorage.setItem("plt_customTypes", JSON.stringify(d.customTypes || []));
+      localStorage.setItem("plt_overrides_v1", JSON.stringify(d.overrides || {}));
+    }
+  } catch (e) {}
+  var last = "";
+  function sync(){
+    try {
+      var ct = localStorage.getItem("plt_customTypes") || "[]", ov = localStorage.getItem("plt_overrides_v1") || "{}";
+      var sig = ct + "|" + ov; if (sig === last) return;
+      var o = {}; try { o = JSON.parse(ov) || {}; } catch (e) {}
+      fetch("/api/templates/sync", {method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({customTypes: JSON.parse(ct), titleOverrides: o.titleOverrides || {}, bodyOverrides: o.bodyOverrides || {}})})
+        .then(function(r){ if (r.ok) last = sig; });
+    } catch (e) {}
+  }
+  setInterval(sync, 3000); addEventListener("beforeunload", sync);
+})();
+</script>
+
+<title>Donini Manager</title>
+<meta name="description" content="Генератор готовых описаний товара на 12 стран по вашему шаблону — меняются только бренд и размер.">
+<style>
+  :root{
+    --bg: #f6f3ee;
+    --surface: #ffffff;
+    --surface-2: #f0ebe2;
+    --text: #241f19;
+    --muted: #7a7167;
+    --border: #e3dbcd;
+    --accent: #8a5432;
+    --accent-ink: #ffffff;
+    --accent-soft: #f1e3d6;
+    --ok: #3f7a52;
+    --focus: #8a5432;
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg: #17130f;
+      --surface: #201a14;
+      --surface-2: #271f18;
+      --text: #f1e9dd;
+      --muted: #ab9d8c;
+      --border: #3a3025;
+      --accent: #d18b56;
+      --accent-ink: #1c1108;
+      --accent-soft: #35281b;
+      --ok: #6ec98a;
+      --focus: #d18b56;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg: #17130f;
+    --surface: #201a14;
+    --surface-2: #271f18;
+    --text: #f1e9dd;
+    --muted: #ab9d8c;
+    --border: #3a3025;
+    --accent: #d18b56;
+    --accent-ink: #1c1108;
+    --accent-soft: #35281b;
+    --ok: #6ec98a;
+    --focus: #d18b56;
+  }
+
+  *{ box-sizing: border-box; }
+  body{
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Work Sans", "Segoe UI", system-ui, sans-serif;
+    padding-inline: 18px;
+    padding-block: 28px;
+    display: flex;
+    justify-content: center;
+  }
+  main{
+    width: 100%;
+    max-width: 920px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  h1{
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    font-size: clamp(26px, 4vw, 34px);
+    letter-spacing: -0.01em;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  .lede{
+    color: var(--muted);
+    font-size: 15px;
+    max-width: 60ch;
+    margin: 0;
+  }
+
+  .panel{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+  }
+
+  form.controls{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: end;
+  }
+  form.controls .field{ flex: 1 1 130px; min-width: 110px; }
+  form.controls .btn-primary{ flex: 0 0 auto; }
+  .field{ display: flex; flex-direction: column; gap: 6px; }
+  .field label{
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .field input{
+    font: inherit;
+    font-family: var(--mono);
+    font-size: 14px;
+    padding: 10px 12px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+  }
+  .field input:focus-visible{
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+  }
+
+  button{
+    font: inherit;
+    cursor: pointer;
+    border-radius: 9px;
+    border: 1px solid transparent;
+  }
+  .btn-primary{
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+    font-size: 14px;
+    padding: 11px 20px;
+    white-space: nowrap;
+  }
+  .btn-primary:hover{ filter: brightness(1.05); }
+
+  .brand-controls{
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+  .switch-row{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+  }
+  .switch{
+    position: relative;
+    width: 38px;
+    height: 22px;
+    flex-shrink: 0;
+  }
+  .switch input{
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  .slider{
+    position: absolute;
+    inset: 0;
+    background: var(--border);
+    border-radius: 999px;
+    transition: background 0.15s;
+  }
+  .slider::before{
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    left: 3px;
+    top: 3px;
+    background: var(--surface);
+    border-radius: 50%;
+    transition: transform 0.15s;
+  }
+  .switch input:checked + .slider{ background: var(--accent); }
+  .switch input:checked + .slider::before{ transform: translateX(16px); }
+  .switch input:focus-visible + .slider{ outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .switch.small{ width: 30px; height: 18px; }
+  .switch.small .slider::before{ width: 12px; height: 12px; left: 3px; top: 3px; }
+  .switch.small input:checked + .slider::before{ transform: translateX(12px); }
+  .brand-toggle-row{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .results-head{
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .results-head h2{
+    font-family: "Fraunces", Georgia, serif;
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+  }
+  .btn-ghost{
+    background: transparent;
+    border-color: var(--border);
+    color: var(--text);
+    font-size: 13px;
+    padding: 7px 12px;
+  }
+  .btn-ghost:hover{ background: var(--surface-2); }
+
+  .lang-chip{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    padding: 7px 13px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+  }
+  .lang-chip .dot{
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--border);
+  }
+  .lang-chip.active{
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--text);
+    font-weight: 600;
+  }
+  .lang-chip.active .dot{ background: var(--accent); }
+
+  .nav-bar{
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 10;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .nav-links{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    overflow-x: auto;
+  }
+  .nav-link{
+    font-size: 12px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--muted);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .nav-link:hover{ border-color: var(--accent); color: var(--text); }
+  .nav-actions{ display: flex; gap: 8px; flex-shrink: 0; }
+  .nav-actions .btn-ghost{ font-size: 12px; padding: 5px 10px; }
+
+  .card-collapse-btn{
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-size: 16px;
+    line-height: 1;
+    padding: 2px 6px;
+    cursor: pointer;
+  }
+  .card-collapse-btn:hover{ color: var(--accent); }
+  .card.collapsed .card-details{ display: none; }
+
+  .drag-handle{
+    cursor: grab;
+    color: var(--muted);
+    font-size: 15px;
+    padding: 2px 4px;
+    user-select: none;
+    touch-action: none;
+  }
+  .drag-handle:active{ cursor: grabbing; }
+  .card.dragging{ opacity: 0.4; }
+  .card.drag-over{ outline: 2px dashed var(--accent); outline-offset: 2px; }
+
+  .grid{
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+  @media (max-width: 640px){
+    .grid{ grid-template-columns: 1fr; }
+  }
+
+  .card{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+  }
+  .card-head{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px 10px;
+  }
+  .copy-both{
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 600;
+    order: 3;
+    flex: 1 1 100%;
+    text-align: center;
+    padding: 8px 10px;
+  }
+  .copy-both.copied{ color: var(--ok); border-color: var(--ok); background: transparent; }
+  .lang-name{
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .lang-code{
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 2px 7px;
+    border-radius: 999px;
+    letter-spacing: 0.04em;
+  }
+  .copy-btn{
+    background: var(--surface-2);
+    border-color: var(--border);
+    color: var(--text);
+    font-size: 12px;
+    padding: 6px 10px;
+    flex-shrink: 0;
+  }
+  .copy-btn:hover{ background: var(--accent-soft); border-color: var(--accent); }
+  .copy-btn.copied{ color: var(--ok); border-color: var(--ok); }
+
+  .block{
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .block-head{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .block-label{
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .title-input,
+  .body-textarea{
+    width: 100%;
+    margin: 0;
+    display: block;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text);
+    font-family: "Work Sans", sans-serif;
+    font-size: 13.5px;
+    line-height: 1.55;
+    padding: 5px 7px;
+    border-radius: 7px;
+    resize: none;
+  }
+  .title-input{ font-weight: 600; }
+  .body-textarea{ overflow: hidden; }
+  .title-input:hover,
+  .body-textarea:hover{ background: var(--surface-2); }
+  .title-input:focus-visible,
+  .body-textarea:focus-visible{
+    outline: none;
+    border-color: var(--focus);
+    background: var(--surface-2);
+  }
+  .divider{
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2px 0;
+  }
+
+  .hidden{ display: none !important; }
+
+  .type-chip-row{ display:flex; flex-wrap:wrap; gap:6px; }
+  .type-chip-row .lang-chip{
+    font-size: 12px;
+    padding: 5px 11px;
+  }
+
+  .toolbar-row{ display: flex; flex-wrap: wrap; gap: 10px; }
+  .type-select-wrap{ position: relative; }
+  .type-dropdown-panel p{ margin: 0 0 10px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .type-dropdown-panel p:last-child{ margin-bottom: 0; }
+  kbd{
+    display: inline-block;
+    min-width: 18px;
+    text-align: center;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 1px 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+    margin: 0 1px;
+  }
+  .type-dropdown-btn{
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 13px;
+    padding: 9px 14px;
+    border-radius: 10px;
+  }
+  .type-dropdown-btn:hover{ border-color: var(--accent); }
+  .type-dropdown-caption{
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .type-dropdown-btn #typeDropdownLabel{ font-weight: 600; }
+  .type-dropdown-btn .chevron{
+    color: var(--muted);
+    font-size: 11px;
+    transition: transform 0.15s;
+  }
+  .type-dropdown-btn.open .chevron{ transform: rotate(180deg); }
+  .type-dropdown-panel{
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    z-index: 30;
+    width: min(480px, calc(100vw - 36px));
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.18);
+    opacity: 0;
+    transform: translateY(-6px);
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+  .type-dropdown-panel.open{
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .top-right-bar{
+    position: fixed;
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    right: 16px;
+    z-index: 40;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .currency-toggle-wrap{ position: relative; }
+
+  .share-toggle-btn,
+  .currency-toggle-btn{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 8px 13px;
+    border-radius: 999px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+    cursor: pointer;
+  }
+  .share-toggle-btn:hover,
+  .currency-toggle-btn:hover{ border-color: var(--accent); color: var(--accent); }
+  .currency-toggle-btn.open{ border-color: var(--accent); color: var(--accent); }
+  @media (max-width: 640px){
+    .share-toggle-btn,
+    .currency-toggle-btn{ padding: 8px 10px; font-size: 0; gap: 0; }
+    .share-toggle-btn span[aria-hidden],
+    .currency-toggle-btn span[aria-hidden]{ font-size: 15px; }
+  }
+
+  .currency-dropdown-panel{
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    left: auto;
+    z-index: 50;
+    width: min(300px, calc(100vw - 32px));
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.18);
+    opacity: 0;
+    transform: translateY(-6px);
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+  .currency-dropdown-panel.open{
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+  .currency-dropdown-panel h2{ font-size: 14px; margin: 0 0 10px; }
+  .currency-amount-row{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .currency-amount-row input{
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 14px;
+    font-family: var(--mono);
+  }
+  .currency-amount-row input:focus-visible{
+    outline: none;
+    border-color: var(--focus);
+  }
+  .currency-amount-row span{ font-size: 12.5px; color: var(--muted); font-weight: 600; }
+  .currency-rows{ display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+  .currency-row{
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 7px 10px;
+    background: var(--surface-2);
+    border-radius: 8px;
+  }
+  .currency-row .currency-label{ font-size: 12.5px; color: var(--muted); font-weight: 600; }
+  .currency-row .currency-value{ font-family: var(--mono); font-size: 14px; font-weight: 600; }
+  .currency-dropdown-panel .currency-note{ margin: 0 0 6px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .currency-dropdown-panel .currency-note:last-child{ margin-bottom: 0; }
+
+  .share-drawer-overlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 15, 10, 0.4);
+    z-index: 60;
+  }
+  .share-drawer{
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: min(360px, 92vw);
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    padding: 20px 18px;
+    padding-top: calc(20px + env(safe-area-inset-top, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+    box-shadow: -16px 0 40px rgba(0,0,0,0.2);
+    transform: translateX(100%);
+    transition: transform 0.22s ease;
+  }
+  .share-drawer-overlay.open .share-drawer{ transform: translateX(0); }
+  .share-drawer-head{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .share-drawer-head h2{
+    font-family: "Fraunces", Georgia, serif;
+    font-size: 17px;
+    font-weight: 600;
+    margin: 0;
+  }
+  .drawer-close-btn{
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 2px 6px;
+  }
+  .drawer-close-btn:hover{ color: var(--text); }
+  .share-drawer-actions{
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .share-drawer-actions .btn-ghost{ text-align: left; }
+
+  .custom-type-actions{
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .btn-danger{
+    color: #b23b3b;
+    border-color: #b23b3b;
+  }
+  .btn-danger-solid{
+    background: #b23b3b;
+    color: #fff;
+  }
+  .btn-danger-solid:hover{ filter: brightness(1.08); }
+
+  .modal-overlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 15, 10, 0.45);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .modal-box{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    width: 100%;
+    max-width: 380px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+  }
+  .modal-title{
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    font-size: 17px;
+  }
+  .modal-input{
+    font: inherit;
+    font-size: 14px;
+    padding: 10px 12px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    width: 100%;
+  }
+  .modal-input:focus-visible{
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+  }
+  .modal-textarea{
+    font-family: var(--mono);
+    font-size: 12px;
+    resize: vertical;
+    min-height: 110px;
+  }
+  .modal-box-wide{ max-width: 520px; }
+  .modal-actions{
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .card.hovered{ border-color: var(--accent); }
+  .copied-badge{
+    display: none;
+    color: var(--ok);
+    font-size: 13px;
+    font-weight: 700;
+    margin-left: 4px;
+  }
+  .card.card-copied .copied-badge{ display: inline; }
+
+  footer{
+    color: var(--muted);
+    font-size: 12.5px;
+    text-align: center;
+  }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+
+<div class="top-right-bar">
+  <div class="currency-toggle-wrap">
+    <button type="button" id="currencyToggleBtn" class="currency-toggle-btn" title="Курс злотого к евро, форинту, лею и кроне">
+      <span aria-hidden="true">💱</span> Курс
+    </button>
+    <div class="currency-dropdown-panel hidden" id="currencyDropdownPanel">
+      <h2>Курс злотого (PLN)</h2>
+      <div class="currency-amount-row">
+        <span>PLN</span>
+        <input type="number" id="currencyAmountInput" value="100" min="0" step="any" inputmode="decimal">
+      </div>
+      <div class="currency-rows" id="currencyRows"></div>
+      <p class="currency-note">Хорватия, Австрия, Греция и Бельгия — евро, курс тот же, что и в строке EUR.</p>
+      <p class="currency-note" id="currencyAsOf">Курсы зафиксированы на дату обновления и не меняются в реальном времени.</p>
+    </div>
+  </div>
+
+  <button type="button" id="shareToggleBtn" class="share-toggle-btn" title="Поделиться шаблонами и рабочим местом с коллегами">
+    <span aria-hidden="true">⇄</span> Поделиться
+  </button>
+</div>
+
+<main>
+  <div>
+    <h1>Donini Manager</h1>
+  </div>
+
+  <div class="toolbar-row">
+    <div class="type-select-wrap">
+      <button type="button" id="typeDropdownBtn" class="type-dropdown-btn">
+        <span class="type-dropdown-caption">Шаблон</span>
+        <span id="typeDropdownLabel">Сумки</span>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="type-dropdown-panel hidden" id="typeDropdownPanel">
+        <div class="results-head" style="margin-bottom: 10px;">
+          <h2 style="font-size: 14px;">Шаблон товара</h2>
+          <button class="btn-ghost" id="addCustomType" type="button" style="font-size:12px; padding:5px 10px;">+ Свой шаблон</button>
+        </div>
+        <div id="typeChips" class="type-chip-row"></div>
+        <div id="customTypeActions" class="custom-type-actions hidden">
+          <button class="btn-ghost" id="saveCustomType" type="button" style="font-size:12px;">Сохранить изменения в шаблон</button>
+          <button class="btn-ghost btn-danger" id="deleteCustomType" type="button" style="font-size:12px;">Удалить шаблон</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="type-select-wrap">
+      <button type="button" id="infoDropdownBtn" class="type-dropdown-btn">
+        <span aria-hidden="true">ⓘ</span>
+        <span>Как пользоваться</span>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="type-dropdown-panel hidden" id="infoDropdownPanel">
+        <p>Введите бренд, размер и код — ниже сразу соберутся готовые описания под все включённые страны. Название и описание в каждой карточке можно поправить вручную перед копированием.</p>
+        <p>Карточки можно перетаскивать мышкой за значок ⠿ в углу — расставь их в том порядке, в котором у тебя открыты вкладки сайтов.</p>
+        <p><strong>Горячие клавиши:</strong> наведи курсор на карточку страны (без клика в поле) и нажми <kbd>1</kbd> — скопировать всё одним куском, <kbd>2</kbd> — только название, <kbd>3</kbd> — только описание. Скопированные карточки помечаются галочкой ✓.</p>
+        <p><strong>Скопировать всё сразу для всех сайтов:</strong> кнопка «Скопировать все страны» копирует тексты всех включённых стран одним куском, с пометкой языка у каждого блока. Если на сайте установлен скрипт-вставка (userscript), он сам найдёт в этом общем блоке нужный язык для текущего сайта — не нужно возвращаться сюда и копировать по одной стране.</p>
+        <p><strong>Цена:</strong> введите цену в злотых в поле «Цена (PLN)» наверху и нажмите «Сгенерировать» — под каждой страной появится готовая цена, уже переведённая в её валюту (евро, форинты, кроны, леи) и округлённая по «красивым» окончаниям: EUR/RON/PLN — на ...9 (159, 849, 699), CZK — на ...90 (3890), HUF — на ...990 (57990). Она копируется вместе с названием и описанием и вставляется скрипт-вставкой в поле цены на сайте отдельно от текста — руками сумму вписывать не нужно.</p>
+      </div>
+    </div>
+  </div>
+
+  <form class="panel controls" id="form">
+    <div class="field">
+      <label for="brand">Бренд</label>
+      <input id="brand" type="text" value="" placeholder="необязательно" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="size">Размер</label>
+      <input id="size" type="text" value="21*14\26*16\30*19 cm" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="code">Код</label>
+      <div style="display:flex; gap:6px;">
+        <input id="code" type="text" value="" placeholder="83278" autocomplete="off" style="flex:1; min-width:0;">
+        <button type="button" id="codePlusOne" class="btn-ghost" title="Прибавить 1 к номеру в конце кода (например, 83278 → 83279)" style="flex-shrink:0; padding:0 12px;">+1</button>
+      </div>
+    </div>
+    <div class="field">
+      <label for="priceZl">Цена (PLN)</label>
+      <input id="priceZl" type="text" value="" placeholder="699" autocomplete="off" inputmode="decimal">
+    </div>
+    <button type="submit" class="btn-primary">Сгенерировать</button>
+  </form>
+
+
+  <section class="panel">
+    <div class="results-head" style="margin-bottom: 10px;">
+      <h2 style="font-size: 15px;">Какие страны показывать</h2>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-ghost" id="langsAll" type="button" style="font-size:12px; padding:5px 10px;">Все</button>
+        <button class="btn-ghost" id="langsNone" type="button" style="font-size:12px; padding:5px 10px;">Ни одной</button>
+      </div>
+    </div>
+    <div id="langChips" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+  </section>
+
+  <div class="nav-bar" id="navBar">
+    <div class="nav-links" id="navLinks"></div>
+    <div class="nav-actions">
+      <button class="btn-ghost" id="resetOrder" type="button" title="Вернуть порядок стран по умолчанию">Сбросить порядок</button>
+      <button class="btn-ghost" id="collapseAll" type="button">Свернуть все</button>
+      <button class="btn-ghost" id="expandAll" type="button">Развернуть все</button>
+    </div>
+  </div>
+  <section>
+    <div class="results-head">
+      <h2>Готовые описания</h2>
+      <button class="btn-ghost" id="copyAll">Скопировать все страны</button>
+    </div>
+  </section>
+
+  <div class="grid" id="grid"></div>
+</main>
+
+<div class="share-drawer-overlay hidden" id="shareDrawerOverlay">
+  <aside class="share-drawer" id="shareDrawer">
+    <div class="share-drawer-head">
+      <h2>Поделиться с коллегами</h2>
+      <button type="button" id="shareDrawerClose" class="drawer-close-btn" title="Закрыть">✕</button>
+    </div>
+    <p class="lede" style="margin-bottom:2px;">Всё это видно только в этом браузере. Чтобы у коллеги было так же — скопируйте код и пришлите ему, а он вставит его одной кнопкой ниже.</p>
+    <div class="custom-type-actions share-drawer-actions">
+      <button class="btn-ghost" id="shareTemplatesBtn" type="button">Скопировать мои шаблоны текста</button>
+      <button class="btn-ghost" id="shareSetupBtn" type="button">Скопировать готовое рабочее место (страны + шаблон)</button>
+      <button class="btn-ghost" id="importCodeBtn" type="button">Вставить код от коллеги</button>
+    </div>
+    <p class="lede" style="font-size:12px;">«Рабочее место» — это активный шаблон товара + какие страны включены + их порядок + где показывать бренд. Например: включаете только Польшу, шаблон «Сумки», копируете «готовое рабочее место» — коллега вставляет код и сразу видит один блок Польши, готовый к работе, где меняется только бренд, размер и код.</p>
+  </aside>
+</div>
+
+<div class="modal-overlay hidden" id="modalOverlay">
+  <div class="modal-box">
+    <div class="modal-title" id="modalTitle"></div>
+    <div id="modalBody"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="modalCancel" type="button">Отмена</button>
+      <button class="btn-primary" id="modalConfirm" type="button">ОК</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const BAGS_LANGS = [
+    {
+      code: "HU", name: "Венгрия",
+      title: (b) => (b ? `${b} Márkás női táska, Bőr, Franciaország` : `Márkás női táska, Bőr, Franciaország`),
+      body: (s) => `méretek: ${s}\nanyag: valódi bőr\nA szett tartalmaz egy márkás dobozt, porvédőt és dokumentumokat\n\nA fotók valódiak!\n\nA minőség kiváló!\n\nAjándéknak is tökéletes!!!\n\nSzállítás 2–4 héten belül`
+    },
+    {
+      code: "DE", name: "Германия",
+      title: (b) => (b ? `Damenhandtasche aus Leder ${b}` : `Damenhandtasche aus Leder`),
+      body: (s) => `Größe: ${s}\nMaterial: echtes Leder\nIm Lieferumfang enthalten: originale Markenbox, Staubbeutel und Dokumente.\nLieferzeit: ca. 14 Tage.\nHervorragende Qualität.\nFotos vom tatsächlichen Produkt!\n\nZahlung per Nachnahme oder per Banküberweisung.\nIdeal als Geschenk!`
+    },
+    {
+      code: "PT", name: "Португалия",
+      title: (b) => (b ? `Bolsa feminina em couro ${b}` : `Bolsa feminina em couro`),
+      body: (s) => `Tamanho: ${s}\nMaterial: couro genuíno\nInclui: caixa original da marca, saco protetor contra o pó e documentos.\nPrazo de entrega: aproximadamente 14 dias.\nQualidade excelente.\nFotos do produto real!\nPagamento à cobrança ou por transferência bancária.\nIdeal para oferecer como presente!`
+    },
+    {
+      code: "ES", name: "Испания",
+      title: (b) => (b ? `Bolso de mano ${b}` : `Bolso de mano`),
+      body: (s) => `Tamaño: ${s}\nMaterial: Piel auténtica\nIncluye caja de la marca y documentación\nEntrega: Aprox. 4-5 días\nExcelente calidad\n¡Foto real!\n\nEnvío a cualquier país.`
+    },
+    {
+      code: "NL", name: "Нидерланды",
+      title: (b) => (b ? `Dameshandtas van leer ${b}` : `Dameshandtas van leer`),
+      body: (s) => `Afmetingen: ${s}\nMateriaal: echt leer\nInclusief: originele merkdoos, stofzak en documentatie.\nLevertijd: ongeveer 14 dagen.\nUitstekende kwaliteit.\nFoto's van het echte product!\n\nBetaling onder rembours of via bankoverschrijving.\nIdeaal als cadeau!`
+    },
+    {
+      code: "PL", name: "Польша",
+      title: (b) => (b ? `Torebka damska skórzana ${b}` : `Torebka damska skórzana`),
+      body: (s) => `Rozmiar: ${s}\nMateriał: skóra naturalna\nW zestawie: oryginalne pudełko marki, worek na kurz i dokumenty.\nCzas dostawy: ok. 14 dni.\nDoskonała jakość.\nZdjęcia rzeczywistego produktu!\n\nPłatność za pobraniem lub przelewem.\nIdealny prezent!`
+    },
+    {
+      code: "RO", name: "Румыния",
+      title: (b) => (b ? `Geantă de damă din piele ${b}` : `Geantă de damă din piele`),
+      body: (s) => `Dimensiuni: ${s}\nMaterial: piele naturală\nInclude: cutie originală a mărcii, husă de praf și documente.\nTermen de livrare: aprox. 14 zile.\nCalitate excelentă.\nFotografii reale ale produsului!\n\nPlata ramburs sau prin transfer bancar.\nIdeal ca cadou!`
+    },
+    {
+      code: "HR", name: "Хорватия",
+      title: (b) => (b ? `Ženska kožna torbica ${b}` : `Ženska kožna torbica`),
+      body: (s) => `Veličina: ${s}\nMaterijal: prava koža\nUključeno: originalna kutija marke, vrećica za prašinu i dokumenti.\nRok isporuke: oko 14 dana.\nOdlična kvaliteta.\nStvarne fotografije proizvoda!\n\nPlaćanje pouzećem ili bankovnim transferom.\nIdealno za poklon!`
+    },
+    {
+      code: "CZ", name: "Чехия",
+      title: (b) => (b ? `Dámská kožená kabelka ${b}` : `Dámská kožená kabelka`),
+      body: (s) => `Velikost: ${s}\nMateriál: pravá kůže\nSoučástí balení: originální krabička značky, prachový sáček a dokumenty.\nDoba dodání: cca 14 dní.\nVynikající kvalita.\nSkutečné fotografie produktu!\n\nPlatba na dobírku nebo bankovním převodem.\nIdeální jako dárek!`
+    },
+    {
+      // Австрия (willhaben.at) — по-немецки, тексты как у Германии
+      code: "AT", name: "Австрия",
+      title: (b) => (b ? `Damenhandtasche aus Leder ${b}` : `Damenhandtasche aus Leder`),
+      body: (s) => `Größe: ${s}\nMaterial: echtes Leder\nIm Lieferumfang enthalten: originale Markenbox, Staubbeutel und Dokumente.\nLieferzeit: ca. 14 Tage.\nHervorragende Qualität.\nFotos vom tatsächlichen Produkt!\n\nZahlung per Nachnahme oder per Banküberweisung.\nIdeal als Geschenk!`
+    },
+    {
+      code: "GR", name: "Греция",
+      title: (b) => (b ? `Γυναικεία δερμάτινη τσάντα ${b}` : `Γυναικεία δερμάτινη τσάντα`),
+      body: (s) => `Μέγεθος: ${s}\nΥλικό: γνήσιο δέρμα\nΠεριλαμβάνει: αυθεντικό κουτί της μάρκας, σακουλάκι προστασίας από τη σκόνη και έγγραφα.\nΧρόνος παράδοσης: περίπου 14 ημέρες.\nΕξαιρετική ποιότητα.\nΠραγματικές φωτογραφίες του προϊόντος!\n\nΠληρωμή με αντικαταβολή ή με τραπεζική μεταφορά.\nΙδανικό για δώρο!`
+    },
+    {
+      // Бельгия (2dehands.be) — по-нидерландски, тексты как у Нидерландов
+      code: "BE", name: "Бельгия",
+      title: (b) => (b ? `Dameshandtas van leer ${b}` : `Dameshandtas van leer`),
+      body: (s) => `Afmetingen: ${s}\nMateriaal: echt leer\nInclusief: originele merkdoos, stofzak en documentatie.\nLevertijd: ongeveer 14 dagen.\nUitstekende kwaliteit.\nFoto's van het echte product!\n\nBetaling onder rembours of via bankoverschrijving.\nIdeaal als cadeau!`
+    }
+  ];
+  // Австрия и Бельгия без своего текста/правки берут текст Германии и Нидерландов
+  const LANG_FALLBACK = { AT: "DE", BE: "NL" };
+
+  // ---- Общие данные для языков (не зависят от шаблона товара) ----
+  const LANG_META = BAGS_LANGS.map(l => ({ code: l.code, name: l.name }));
+  const ALL_CODES = LANG_META.map(l => l.code);
+
+  // ---- Конструктор шаблонов для остальных типов товара ----
+  const BODY_BUILDERS = {
+    HU: (s, m) => `méretek: ${s}\nanyag: ${m}\nA szett tartalmaz egy márkás dobozt, porvédőt és dokumentumokat\n\nA fotók valódiak!\n\nA minőség kiváló!\n\nAjándéknak is tökéletes!!!\n\nSzállítás 2–4 héten belül`,
+    DE: (s, m) => `Größe: ${s}\nMaterial: ${m}\nIm Lieferumfang enthalten: originale Markenbox, Staubbeutel und Dokumente.\nLieferzeit: ca. 14 Tage.\nHervorragende Qualität.\nFotos vom tatsächlichen Produkt!\n\nZahlung per Nachnahme oder per Banküberweisung.\nIdeal als Geschenk!`,
+    PT: (s, m) => `Tamanho: ${s}\nMaterial: ${m}\nInclui: caixa original da marca, saco protetor contra o pó e documentos.\nPrazo de entrega: aproximadamente 14 dias.\nQualidade excelente.\nFotos do produto real!\nPagamento à cobrança ou por transferência bancária.\nIdeal para oferecer como presente!`,
+    ES: (s, m) => `Tamaño: ${s}\nMaterial: ${m}\nIncluye caja de la marca y documentación\nEntrega: Aprox. 4-5 días\nExcelente calidad\n¡Foto real!\n\nEnvío a cualquier país.`,
+    NL: (s, m) => `Afmetingen: ${s}\nMateriaal: ${m}\nInclusief: originele merkdoos, stofzak en documentatie.\nLevertijd: ongeveer 14 dagen.\nUitstekende kwaliteit.\nFoto's van het echte product!\n\nBetaling onder rembours of via bankoverschrijving.\nIdeaal als cadeau!`,
+    PL: (s, m) => `Rozmiar: ${s}\nMateriał: ${m}\nW zestawie: oryginalne pudełko marki, worek na kurz i dokumenty.\nCzas dostawy: ok. 14 dni.\nDoskonała jakość.\nZdjęcia rzeczywistego produktu!\n\nPłatność za pobraniem lub przelewem.\nIdealny prezent!`,
+    RO: (s, m) => `Dimensiuni: ${s}\nMaterial: ${m}\nInclude: cutie originală a mărcii, husă de praf și documente.\nTermen de livrare: aprox. 14 zile.\nCalitate excelentă.\nFotografii reale ale produsului!\n\nPlata ramburs sau prin transfer bancar.\nIdeal ca cadou!`,
+    HR: (s, m) => `Veličina: ${s}\nMaterijal: ${m}\nUključeno: originalna kutija marke, vrećica za prašinu i dokumenti.\nRok isporuke: oko 14 dana.\nOdlična kvaliteta.\nStvarne fotografije proizvoda!\n\nPlaćanje pouzećem ili bankovnim transferom.\nIdealno za poklon!`,
+    CZ: (s, m) => `Velikost: ${s}\nMateriál: ${m}\nSoučástí balení: originální krabička značky, prachový sáček a dokumenty.\nDoba dodání: cca 14 dní.\nVynikající kvalita.\nSkutečné fotografie produktu!\n\nPlatba na dobírku nebo bankovním převodem.\nIdeální jako dárek!`,
+    GR: (s, m) => `Μέγεθος: ${s}\nΥλικό: ${m}\nΠεριλαμβάνει: αυθεντικό κουτί της μάρκας, σακουλάκι προστασίας από τη σκόνη και έγγραφα.\nΧρόνος παράδοσης: περίπου 14 ημέρες.\nΕξαιρετική ποιότητα.\nΠραγματικές φωτογραφίες του προϊόντος!\n\nΠληρωμή με αντικαταβολή ή με τραπεζική μεταφορά.\nΙδανικό για δώρο!`
+  };
+  BODY_BUILDERS.AT = BODY_BUILDERS.DE;
+  BODY_BUILDERS.BE = BODY_BUILDERS.NL;
+
+  const MATERIALS = {
+    leather: { HU: "valódi bőr", DE: "echtes Leder", PT: "couro genuíno", ES: "Piel auténtica", NL: "echt leer", PL: "skóra naturalna", RO: "piele naturală", HR: "prava koža", CZ: "pravá kůže" },
+    wool:    { HU: "valódi gyapjú", DE: "echte Wolle", PT: "lã genuína", ES: "Lana auténtica", NL: "echte wol", PL: "wełna naturalna", RO: "lână naturală", HR: "prava vuna", CZ: "pravá vlna" },
+    silk:    { HU: "valódi selyem", DE: "echte Seide", PT: "seda genuína", ES: "Seda auténtica", NL: "echte zijde", PL: "jedwab naturalny", RO: "mătase naturală", HR: "prava svila", CZ: "pravé hedvábí" },
+    quality: { HU: "kiváló minőségű anyag", DE: "hochwertiges Material", PT: "material de alta qualidade", ES: "Material de alta calidad", NL: "hoogwaardig materiaal", PL: "materiał wysokiej jakości", RO: "material de calitate superioară", HR: "kvalitetan materijal", CZ: "kvalitní materiál" },
+    down:    { HU: "valódi pehely", DE: "echte Daunen", PT: "penugem genuína", ES: "Plumón auténtico", NL: "echt dons", PL: "prawdziwy puch", RO: "puf natural", HR: "prirodno perje", CZ: "pravé peří" }
+  };
+
+  const GR_MATERIALS = { leather: "γνήσιο δέρμα", wool: "γνήσιο μαλλί", silk: "γνήσιο μετάξι", quality: "υψηλής ποιότητας υλικό", down: "φυσικό πούπουλο" };
+  Object.keys(MATERIALS).forEach(k => { MATERIALS[k].GR = GR_MATERIALS[k]; MATERIALS[k].AT = MATERIALS[k].DE; MATERIALS[k].BE = MATERIALS[k].NL; });
+
+  const TYPE_NOUNS = {
+    wallets: {
+      HU: { noun: "pénztárca", titleMaterial: "Bőr" }, DE: { noun: "Geldbörse", titleMaterial: "Leder" },
+      PT: { noun: "Carteira", titleMaterial: "couro" }, ES: { noun: "Cartera" },
+      NL: { noun: "Portemonnee", titleMaterial: "leer" }, PL: { noun: "Portfel skórzany" },
+      RO: { noun: "Portofel", titleMaterial: "piele" }, HR: { noun: "Kožni novčanik" }, CZ: { noun: "Kožená peněženka" }
+    },
+    belts: {
+      HU: { noun: "öv", titleMaterial: "Bőr" }, DE: { noun: "Gürtel", titleMaterial: "Leder" },
+      PT: { noun: "Cinto", titleMaterial: "couro" }, ES: { noun: "Cinturón" },
+      NL: { noun: "Riem", titleMaterial: "leer" }, PL: { noun: "Pasek skórzany" },
+      RO: { noun: "Curea", titleMaterial: "piele" }, HR: { noun: "Kožni remen" }, CZ: { noun: "Kožený pásek" }
+    },
+    hats: {
+      HU: { noun: "sapka", titleMaterial: "Gyapjú" }, DE: { noun: "Mütze", titleMaterial: "Wolle" },
+      PT: { noun: "Gorro", titleMaterial: "lã" }, ES: { noun: "Gorro" },
+      NL: { noun: "Muts", titleMaterial: "wol" }, PL: { noun: "Czapka wełniana" },
+      RO: { noun: "Căciulă", titleMaterial: "lână" }, HR: { noun: "Vunena kapa" }, CZ: { noun: "Vlněná čepice" }
+    },
+    scarves: {
+      HU: { noun: "sál", titleMaterial: "Selyem" }, DE: { noun: "Schal", titleMaterial: "Seide" },
+      PT: { noun: "Cachecol", titleMaterial: "seda" }, ES: { noun: "Bufanda" },
+      NL: { noun: "Sjaal", titleMaterial: "zijde" }, PL: { noun: "Szalik jedwabny" },
+      RO: { noun: "Eșarfă", titleMaterial: "mătase" }, HR: { noun: "Svilena marama" }, CZ: { noun: "Hedvábný šátek" }
+    },
+    sportbags: {
+      HU: { noun: "sporttáska", titleMaterial: "Minőségi anyag" }, DE: { noun: "Sporttasche", titleMaterial: "hochwertigem Material" },
+      PT: { noun: "Mala de desporto", titleMaterial: "material de alta qualidade" }, ES: { noun: "Bolsa deportiva" },
+      NL: { noun: "Sporttas", titleMaterial: "hoogwaardig materiaal" }, PL: { noun: "Torba sportowa" },
+      RO: { noun: "Geantă sport", titleMaterial: "material de calitate superioară" }, HR: { noun: "Sportska torba" }, CZ: { noun: "Sportovní taška" }
+    },
+    ties: {
+      HU: { noun: "nyakkendő", titleMaterial: "Selyem" }, DE: { noun: "Krawatte", titleMaterial: "Seide" },
+      PT: { noun: "Gravata", titleMaterial: "seda" }, ES: { noun: "Corbata" },
+      NL: { noun: "Stropdas", titleMaterial: "zijde" }, PL: { noun: "Krawat jedwabny" },
+      RO: { noun: "Cravată", titleMaterial: "mătase" }, HR: { noun: "Svilena kravata" }, CZ: { noun: "Hedvábná kravata" }
+    },
+    shoes: {
+      HU: { noun: "cipő", titleMaterial: "Bőr" }, DE: { noun: "Schuhe", titleMaterial: "Leder" },
+      PT: { noun: "Sapatos", titleMaterial: "couro" }, ES: { noun: "Zapatos" },
+      NL: { noun: "Schoenen", titleMaterial: "leer" }, PL: { noun: "Buty skórzane" },
+      RO: { noun: "Pantofi", titleMaterial: "piele" }, HR: { noun: "Kožne cipele" }, CZ: { noun: "Kožené boty" }
+    },
+    swimsuits: {
+      HU: { noun: "fürdőruha", titleMaterial: "Minőségi anyag" }, DE: { noun: "Badeanzug", titleMaterial: "hochwertigem Material" },
+      PT: { noun: "Fato de banho", titleMaterial: "material de alta qualidade" }, ES: { noun: "Bañador" },
+      NL: { noun: "Badpak", titleMaterial: "hoogwaardig materiaal" }, PL: { noun: "Strój kąpielowy" },
+      RO: { noun: "Costum de baie", titleMaterial: "material de calitate superioară" }, HR: { noun: "Kupaći kostim" }, CZ: { noun: "Plavky" }
+    },
+    downjackets: {
+      HU: { noun: "kabát", titleMaterial: "Pehely" }, DE: { noun: "Jacke", titleMaterial: "Daunen" },
+      PT: { noun: "Casaco", titleMaterial: "penugem" }, ES: { noun: "Chaqueta" },
+      NL: { noun: "Jas", titleMaterial: "dons" }, PL: { noun: "Kurtka puchowa" },
+      RO: { noun: "Geacă", titleMaterial: "puf" }, HR: { noun: "Perjana jakna" }, CZ: { noun: "Péřová bunda" }
+    },
+    caps: {
+      HU: { noun: "baseballsapka", titleMaterial: "Minőségi anyag" }, DE: { noun: "Baseballcap", titleMaterial: "hochwertigem Material" },
+      PT: { noun: "Boné", titleMaterial: "material de alta qualidade" }, ES: { noun: "Gorra" },
+      NL: { noun: "Pet", titleMaterial: "hoogwaardig materiaal" }, PL: { noun: "Czapka z daszkiem" },
+      RO: { noun: "Șapcă", titleMaterial: "material de calitate superioară" }, HR: { noun: "Kapa s vizirom" }, CZ: { noun: "Kšiltovka" }
+    }
+  };
+
+  const GR_NOUNS = { wallets: "Δερμάτινο πορτοφόλι", belts: "Δερμάτινη ζώνη", hats: "Μάλλινος σκούφος", scarves: "Μεταξωτό φουλάρι", sportbags: "Αθλητική τσάντα", ties: "Μεταξωτή γραβάτα", shoes: "Δερμάτινα παπούτσια", swimsuits: "Μαγιό", downjackets: "Πουπουλένιο μπουφάν", caps: "Καπέλο τζόκεϊ" };
+  Object.keys(TYPE_NOUNS).forEach(k => { TYPE_NOUNS[k].GR = { noun: GR_NOUNS[k] }; TYPE_NOUNS[k].AT = TYPE_NOUNS[k].DE; TYPE_NOUNS[k].BE = TYPE_NOUNS[k].NL; });
+
+  const TYPE_MATERIAL_KEY = { wallets: "leather", belts: "leather", hats: "wool", scarves: "silk", sportbags: "quality", ties: "silk", shoes: "leather", swimsuits: "quality", downjackets: "down", caps: "quality" };
+  const TYPE_LABELS = { wallets: "Кошельки", belts: "Ремни", hats: "Шапки", scarves: "Шарфы", sportbags: "Спортивные сумки", ties: "Галстуки", shoes: "Обувь", swimsuits: "Купальники", downjackets: "Пуховики", caps: "Кепки" };
+
+  function buildTitleFn(code, nounData){
+    switch (code){
+      case "HU": return (b) => b ? `${b} Márkás ${nounData.noun}, ${nounData.titleMaterial}, Franciaország` : `Márkás ${nounData.noun}, ${nounData.titleMaterial}, Franciaország`;
+      case "DE": case "AT": { const base = `${nounData.noun} aus ${nounData.titleMaterial}`; return (b) => b ? `${base} ${b}` : base; }
+      case "PT": { const base = `${nounData.noun} em ${nounData.titleMaterial}`; return (b) => b ? `${base} ${b}` : base; }
+      case "ES": return (b) => b ? `${nounData.noun} ${b}` : nounData.noun;
+      case "NL": case "BE": { const base = `${nounData.noun} van ${nounData.titleMaterial}`; return (b) => b ? `${base} ${b}` : base; }
+      case "PL": return (b) => b ? `${nounData.noun} ${b}` : nounData.noun;
+      case "RO": { const base = `${nounData.noun} din ${nounData.titleMaterial}`; return (b) => b ? `${base} ${b}` : base; }
+      case "HR": return (b) => b ? `${nounData.noun} ${b}` : nounData.noun;
+      case "CZ": return (b) => b ? `${nounData.noun} ${b}` : nounData.noun;
+      default: return (b) => b ? `${nounData.noun} ${b}` : nounData.noun;
+    }
+  }
+
+  function buildTypeLangs(typeId){
+    const nouns = TYPE_NOUNS[typeId];
+    const materialKey = TYPE_MATERIAL_KEY[typeId];
+    return LANG_META.map(({ code, name }) => {
+      const nounData = nouns[code];
+      const material = MATERIALS[materialKey][code];
+      const titleFn = buildTitleFn(code, nounData);
+      return { code, name, title: titleFn, body: (s) => BODY_BUILDERS[code](s, material) };
+    });
+  }
+
+  const BUILT_IN_TYPES = [
+    { id: "bags", label: "Сумки", langs: BAGS_LANGS },
+    { id: "wallets", label: TYPE_LABELS.wallets, langs: buildTypeLangs("wallets") },
+    { id: "belts", label: TYPE_LABELS.belts, langs: buildTypeLangs("belts") },
+    { id: "hats", label: TYPE_LABELS.hats, langs: buildTypeLangs("hats") },
+    { id: "scarves", label: TYPE_LABELS.scarves, langs: buildTypeLangs("scarves") },
+    { id: "sportbags", label: TYPE_LABELS.sportbags, langs: buildTypeLangs("sportbags") },
+    { id: "ties", label: TYPE_LABELS.ties, langs: buildTypeLangs("ties") },
+    { id: "shoes", label: TYPE_LABELS.shoes, langs: buildTypeLangs("shoes") },
+    { id: "swimsuits", label: TYPE_LABELS.swimsuits, langs: buildTypeLangs("swimsuits") },
+    { id: "downjackets", label: TYPE_LABELS.downjackets, langs: buildTypeLangs("downjackets") },
+    { id: "caps", label: TYPE_LABELS.caps, langs: buildTypeLangs("caps") }
+  ];
+
+  function customTypeToRuntime(ct){
+    return {
+      id: ct.id, label: ct.label, custom: true,
+      langs: LANG_META.map(({ code, name }) => {
+        const own = ct.langs && (ct.langs[code] || ct.langs[LANG_FALLBACK[code]]);
+        if (own && (own.title || own.body)) return { code, name, title: () => own.title, body: () => own.body };
+        // для новой страны (например, Греции) в своём шаблоне текста ещё нет — показываем стандартный «Сумки»;
+        // поправьте его в карточке, правка сохранится и уйдёт в программу
+        const std = BAGS_LANGS.find(l => l.code === code);
+        return { code, name, title: () => std ? std.title("") : "", body: (s) => std ? std.body(s) : "" };
+      })
+    };
+  }
+
+  const grid = document.getElementById("grid");
+  const form = document.getElementById("form");
+  const brandInput = document.getElementById("brand");
+  const sizeInput = document.getElementById("size");
+  const codeInput = document.getElementById("code");
+  const priceZlInput = document.getElementById("priceZl");
+  const copyAllBtn = document.getElementById("copyAll");
+  const codePlusOneBtn = document.getElementById("codePlusOne");
+  const navLinks = document.getElementById("navLinks");
+  const collapseAllBtn = document.getElementById("collapseAll");
+  const expandAllBtn = document.getElementById("expandAll");
+
+  const DEFAULT_BRAND_LANGS = ["HU", "NL"];
+  let cardRefs = [];
+  let brandLangs = new Set(DEFAULT_BRAND_LANGS);
+  let visibleLangs = new Set(ALL_CODES);
+  let collapsedLangs = new Set();
+  let order = [...ALL_CODES];
+  let dragCode = null;
+  let hoveredCode = null;
+
+  // ---- Ручные правки названия/описания, сделанные прямо в карточке ----
+  // Как только человек сам меняет текст в поле, эта карточка "отвязывается" от
+  // автогенерации, но не теряет связь с брендом/размером/кодом: при следующем
+  // «Сгенерировать» в сохранённом тексте ищутся старые значения бренда/кода
+  // (в названии) или размера (в описании) и заменяются на новые — остальной
+  // ручной текст остаётся как есть. Сброс к чистому автотексту — кнопкой ↺.
+  // Ключ учитывает и шаблон товара, чтобы правки не "утекали" между шаблонами.
+  // Формат записи: { text, brand, code } для названия, { text, size } для описания —
+  // "brand"/"code"/"size" это те значения, что были подставлены в text в последний раз.
+  let titleOverrides = {};
+  let bodyOverrides = {};
+  function overrideKey(code){ return currentTypeId + ":" + code; }
+  // Ручные правки сохраняются в localStorage, чтобы не пропадать при перезагрузке
+  // страницы/вкладки — раньше они жили только в переменной в памяти и терялись,
+  // как только страница обновлялась (закрыли вкладку, вернулись на следующий день
+  // и т.п.) — из-за этого казалось, что текст «сам» откатывается на автоперевод.
+  const OVERRIDES_KEY = "plt_overrides_v1";
+  function saveOverrides(){
+    try { localStorage.setItem(OVERRIDES_KEY, JSON.stringify({ titleOverrides, bodyOverrides })); } catch(e) {}
+  }
+  function loadOverrides(){
+    try {
+      const raw = localStorage.getItem(OVERRIDES_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        if (parsed.titleOverrides && typeof parsed.titleOverrides === "object") titleOverrides = parsed.titleOverrides;
+        if (parsed.bodyOverrides && typeof parsed.bodyOverrides === "object") bodyOverrides = parsed.bodyOverrides;
+      }
+    } catch(e) {}
+  }
+  // Правки хранятся по ключу «шаблон:язык», поэтому переключение шаблона само по
+  // себе не должно их стирать — ключи для другого шаблона просто не совпадут и не
+  // применятся, а вернувшись к прежнему шаблону, правки снова окажутся на месте.
+  // (Раньше здесь был clearOverrides(), который затирал вообще ВСЕ шаблоны разом —
+  // это и было одной из причин пропажи ручных правок «со временем».)
+  function clearOverrides(){ /* больше не используется для сброса при смене шаблона — оставлено для явного сброса кнопкой ↺, см. ниже */ }
+  // Заменяет в тексте все вхождения старого значения на новое (без эффекта при пустой/неизменной строке).
+  function substituteInOverride(text, oldVal, newVal){
+    if (!oldVal || oldVal === newVal) return text;
+    return text.split(oldVal).join(newVal);
+  }
+  const langChips = document.getElementById("langChips");
+  const langsAllBtn = document.getElementById("langsAll");
+  const langsNoneBtn = document.getElementById("langsNone");
+  const resetOrderBtn = document.getElementById("resetOrder");
+
+  // ---- Шаблон товара (тип: сумки/кошельки/... + пользовательские) ----
+  const typeChips = document.getElementById("typeChips");
+  const addCustomTypeBtn = document.getElementById("addCustomType");
+  const customTypeActions = document.getElementById("customTypeActions");
+  const saveCustomTypeBtn = document.getElementById("saveCustomType");
+  const deleteCustomTypeBtn = document.getElementById("deleteCustomType");
+  const shareTemplatesBtn = document.getElementById("shareTemplatesBtn");
+  const shareSetupBtn = document.getElementById("shareSetupBtn");
+  const importCodeBtn = document.getElementById("importCodeBtn");
+
+  function loadCustomTypes(){
+    try{
+      const raw = localStorage.getItem("plt_customTypes");
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    }catch(e){ return []; }
+  }
+  function saveCustomTypes(){
+    try{ localStorage.setItem("plt_customTypes", JSON.stringify(customTypes)); }catch(e){}
+  }
+
+  let customTypes = loadCustomTypes();
+  let PRODUCT_TYPES = [...BUILT_IN_TYPES, ...customTypes.map(customTypeToRuntime)];
+  let currentTypeId = safeGetTypeId();
+
+  function safeGetTypeId(){
+    try{ return localStorage.getItem("plt_productType") || "bags"; }catch(e){ return "bags"; }
+  }
+
+  function getActiveLangs(){
+    const t = PRODUCT_TYPES.find(t => t.id === currentTypeId);
+    return (t || PRODUCT_TYPES[0]).langs;
+  }
+
+  function rebuildProductTypes(){
+    PRODUCT_TYPES = [...BUILT_IN_TYPES, ...customTypes.map(customTypeToRuntime)];
+  }
+
+  function renderTypeChips(){
+    typeChips.innerHTML = "";
+    PRODUCT_TYPES.forEach(t => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "lang-chip" + (t.id === currentTypeId ? " active" : "");
+      chip.innerHTML = `<span class="dot"></span>${t.label}${t.custom ? " ✎" : ""}`;
+      chip.addEventListener("click", () => {
+        if (t.id === currentTypeId) { setTypeDropdownOpen(false); return; }
+        currentTypeId = t.id;
+        safeSet("plt_productType", currentTypeId);
+        clearOverrides();
+        renderTypeChips();
+        updateCustomTypeActionsVisibility();
+        updateTypeDropdownLabel();
+        render();
+        setTypeDropdownOpen(false);
+      });
+      typeChips.appendChild(chip);
+    });
+    updateTypeDropdownLabel();
+  }
+
+  function updateCustomTypeActionsVisibility(){
+    const t = PRODUCT_TYPES.find(t => t.id === currentTypeId);
+    customTypeActions.classList.toggle("hidden", !(t && t.custom));
+  }
+
+  function updateTypeDropdownLabel(){
+    const t = PRODUCT_TYPES.find(t => t.id === currentTypeId);
+    typeDropdownLabel.textContent = t ? t.label : "Сумки";
+  }
+
+  // ---- Компактный выпадающий выбор шаблона товара ----
+  const typeDropdownBtn = document.getElementById("typeDropdownBtn");
+  const typeDropdownLabel = document.getElementById("typeDropdownLabel");
+  const typeDropdownPanel = document.getElementById("typeDropdownPanel");
+
+  function setTypeDropdownOpen(open){
+    typeDropdownPanel.classList.toggle("open", open);
+    typeDropdownPanel.classList.toggle("hidden", !open);
+    typeDropdownBtn.classList.toggle("open", open);
+  }
+  typeDropdownBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    setInfoDropdownOpen(false);
+    if (typeof setCurrencyDropdownOpen === "function") setCurrencyDropdownOpen(false);
+    setTypeDropdownOpen(!typeDropdownPanel.classList.contains("open"));
+  });
+
+  // ---- Компактная подсказка «Как пользоваться» (тот же выпадающий стиль) ----
+  const infoDropdownBtn = document.getElementById("infoDropdownBtn");
+  const infoDropdownPanel = document.getElementById("infoDropdownPanel");
+
+  function setInfoDropdownOpen(open){
+    infoDropdownPanel.classList.toggle("open", open);
+    infoDropdownPanel.classList.toggle("hidden", !open);
+    infoDropdownBtn.classList.toggle("open", open);
+  }
+  infoDropdownBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    setTypeDropdownOpen(false);
+    if (typeof setCurrencyDropdownOpen === "function") setCurrencyDropdownOpen(false);
+    setInfoDropdownOpen(!infoDropdownPanel.classList.contains("open"));
+  });
+
+  // ---- Курс валют (справка, курс на дату снимка — без живого обновления) ----
+  const CURRENCY_RATES_BASE = "PLN";
+  const CURRENCY_RATES = { EUR: 0.227968, HUF: 83.27094, RON: 1.218239, CZK: 5.5601 };
+  const CURRENCY_RATES_ASOF = "13 октября 2026";
+
+  // ---- Автоконвертация цены (введённой в злотых) в валюту каждой страны ----
+  // Хорватия с 2023 года использует евро, поэтому у неё тоже EUR. Курсы — те же,
+  // что и в справке выше (снимок на CURRENCY_RATES_ASOF, без живого обновления).
+  const LANG_CURRENCY = { HU: "HUF", DE: "EUR", PT: "EUR", ES: "EUR", NL: "EUR", PL: "PLN", RO: "RON", HR: "EUR", CZ: "CZK", AT: "EUR", GR: "EUR", BE: "EUR" };
+  function priceRateFromPLN(currency){
+    return currency === "PLN" ? 1 : CURRENCY_RATES[currency];
+  }
+  // Шарм-прайсинг: округляем ВСЕГДА ВВЕРХ (никогда вниз, независимо от того,
+  // больше или меньше 5 остаток) до ближайшего числа с «красивым» окончанием.
+  // HUF — до ...990, CZK — до ...90, остальные валюты (EUR, RON, PLN) — до ...9.
+  // Например 252 → 259, а не 249; любое значение от 1 до 9 → 9.
+  function roundCharmPrice(value, currency){
+    if (!isFinite(value) || value <= 0) return value;
+    let step, offset;
+    if (currency === "HUF") { step = 1000; offset = 10; }
+    else if (currency === "CZK") { step = 100; offset = 10; }
+    else { step = 10; offset = 1; }
+    let rounded = Math.ceil((value + offset) / step) * step - offset;
+    if (rounded <= 0) rounded = step - offset;
+    return rounded;
+  }
+  // Возвращает { value, currency } (value — целое число с красивым, «шармовым»
+  // окончанием: ...9 для EUR/RON/PLN, ...90 для CZK, ...990 для HUF) или null,
+  // если цена не введена/некорректна.
+  function convertPriceForLang(plnPrice, code){
+    if (!isFinite(plnPrice) || plnPrice <= 0) return null;
+    const currency = LANG_CURRENCY[code];
+    const rate = priceRateFromPLN(currency);
+    if (!rate) return null;
+    return { value: roundCharmPrice(plnPrice * rate, currency), currency };
+  }
+  const CURRENCY_ROWS_META = [
+    { code: "EUR", label: "EUR — евро" },
+    { code: "HUF", label: "HUF — венгерский форинт" },
+    { code: "HR", label: "Хорватия (евро)", useRate: "EUR" },
+    { code: "RON", label: "RON — румынский лей" },
+    { code: "CZK", label: "CZK — чешская крона" }
+  ];
+
+  const currencyToggleBtn = document.getElementById("currencyToggleBtn");
+  const currencyDropdownPanel = document.getElementById("currencyDropdownPanel");
+  const currencyAmountInput = document.getElementById("currencyAmountInput");
+  const currencyRows = document.getElementById("currencyRows");
+  const currencyAsOf = document.getElementById("currencyAsOf");
+
+  currencyAsOf.textContent = `Курсы — снимок на ${CURRENCY_RATES_ASOF}, не обновляются в реальном времени (источник: Exchange Rate API).`;
+
+  function formatCurrencyValue(n){
+    if (!isFinite(n)) return "—";
+    return n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function renderCurrencyRows(){
+    const raw = parseFloat(currencyAmountInput.value);
+    const amount = isFinite(raw) ? raw : 0;
+    currencyRows.innerHTML = "";
+    CURRENCY_ROWS_META.forEach(row => {
+      const rate = CURRENCY_RATES[row.useRate || row.code];
+      const value = amount * rate;
+      const el = document.createElement("div");
+      el.className = "currency-row";
+      el.innerHTML = `<span class="currency-label">${row.label}</span><span class="currency-value">${formatCurrencyValue(value)}</span>`;
+      currencyRows.appendChild(el);
+    });
+  }
+  currencyAmountInput.addEventListener("input", renderCurrencyRows);
+  renderCurrencyRows();
+
+  function setCurrencyDropdownOpen(open){
+    currencyDropdownPanel.classList.toggle("open", open);
+    currencyDropdownPanel.classList.toggle("hidden", !open);
+    currencyToggleBtn.classList.toggle("open", open);
+  }
+  currencyToggleBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    setTypeDropdownOpen(false);
+    setInfoDropdownOpen(false);
+    setCurrencyDropdownOpen(!currencyDropdownPanel.classList.contains("open"));
+  });
+
+  document.addEventListener("click", (e) => {
+    if (typeDropdownPanel.classList.contains("open") && !typeDropdownPanel.contains(e.target) && !typeDropdownBtn.contains(e.target)){
+      setTypeDropdownOpen(false);
+    }
+    if (infoDropdownPanel.classList.contains("open") && !infoDropdownPanel.contains(e.target) && !infoDropdownBtn.contains(e.target)){
+      setInfoDropdownOpen(false);
+    }
+    if (currencyDropdownPanel.classList.contains("open") && !currencyDropdownPanel.contains(e.target) && !currencyToggleBtn.contains(e.target)){
+      setCurrencyDropdownOpen(false);
+    }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape"){ setTypeDropdownOpen(false); setInfoDropdownOpen(false); setCurrencyDropdownOpen(false); }
+  });
+
+  // ---- Боковая панель «Поделиться» ----
+  const shareToggleBtn = document.getElementById("shareToggleBtn");
+  const shareDrawerOverlay = document.getElementById("shareDrawerOverlay");
+  const shareDrawerClose = document.getElementById("shareDrawerClose");
+
+  function setShareDrawerOpen(open){
+    if (open){
+      shareDrawerOverlay.classList.remove("hidden");
+      requestAnimationFrame(() => shareDrawerOverlay.classList.add("open"));
+    } else {
+      shareDrawerOverlay.classList.remove("open");
+      setTimeout(() => shareDrawerOverlay.classList.add("hidden"), 220);
+    }
+  }
+  shareToggleBtn.addEventListener("click", () => {
+    setTypeDropdownOpen(false);
+    setInfoDropdownOpen(false);
+    if (typeof setCurrencyDropdownOpen === "function") setCurrencyDropdownOpen(false);
+    setShareDrawerOpen(true);
+  });
+  shareDrawerClose.addEventListener("click", () => setShareDrawerOpen(false));
+  shareDrawerOverlay.addEventListener("mousedown", (e) => { if (e.target === shareDrawerOverlay) setShareDrawerOpen(false); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") setShareDrawerOpen(false); });
+
+  // ---- Модальное окно (свои prompt/confirm — системные диалоги заблокированы внутри артефакта) ----
+  const modalOverlay = document.getElementById("modalOverlay");
+  const modalBoxEl = document.querySelector("#modalOverlay .modal-box");
+  const modalTitleEl = document.getElementById("modalTitle");
+  const modalBodyEl = document.getElementById("modalBody");
+  const modalConfirmBtn = document.getElementById("modalConfirm");
+  const modalCancelBtn = document.getElementById("modalCancel");
+
+  function openModal({ title, message, showInput, inputValue = "", inputPlaceholder = "", showTextarea, textareaValue = "", textareaPlaceholder = "", confirmLabel = "ОК", danger = false, wide = false, hideCancel = false, onConfirm }){
+    modalTitleEl.textContent = title;
+    modalBodyEl.innerHTML = "";
+    modalBoxEl.classList.toggle("modal-box-wide", !!wide);
+    modalCancelBtn.style.display = hideCancel ? "none" : "";
+    if (message){
+      const p = document.createElement("p");
+      p.className = "lede";
+      p.style.margin = "0";
+      p.textContent = message;
+      modalBodyEl.appendChild(p);
+    }
+    let input = null;
+    if (showInput){
+      input = document.createElement("input");
+      input.type = "text";
+      input.className = "modal-input";
+      input.value = inputValue;
+      input.placeholder = inputPlaceholder;
+      modalBodyEl.appendChild(input);
+    }
+    let textarea = null;
+    if (showTextarea){
+      textarea = document.createElement("textarea");
+      textarea.className = "modal-input modal-textarea";
+      textarea.value = textareaValue;
+      textarea.placeholder = textareaPlaceholder;
+      textarea.rows = 6;
+      modalBodyEl.appendChild(textarea);
+    }
+    const field = input || textarea;
+    modalConfirmBtn.textContent = confirmLabel;
+    modalConfirmBtn.className = "btn-primary" + (danger ? " btn-danger-solid" : "");
+    modalOverlay.classList.remove("hidden");
+    if (field) setTimeout(() => { field.focus(); if (field.select) field.select(); }, 20);
+
+    function cleanup(){
+      modalOverlay.classList.add("hidden");
+      modalConfirmBtn.removeEventListener("click", handleConfirm);
+      modalCancelBtn.removeEventListener("click", handleCancel);
+      modalOverlay.removeEventListener("mousedown", handleOverlayClick);
+      document.removeEventListener("keydown", handleKeydown);
+    }
+    function handleConfirm(){
+      const val = field ? field.value.trim() : true;
+      if (field && !val){ field.focus(); return; }
+      cleanup();
+      onConfirm(val);
+    }
+    function handleCancel(){ cleanup(); }
+    function handleOverlayClick(e){ if (e.target === modalOverlay) cleanup(); }
+    function handleKeydown(e){
+      if (e.key === "Escape") { cleanup(); return; }
+      if (e.key === "Enter" && input) handleConfirm();
+    }
+    modalConfirmBtn.addEventListener("click", handleConfirm);
+    modalCancelBtn.addEventListener("click", handleCancel);
+    modalOverlay.addEventListener("mousedown", handleOverlayClick);
+    document.addEventListener("keydown", handleKeydown);
+  }
+
+  addCustomTypeBtn.addEventListener("click", () => {
+    openModal({
+      title: "Новый шаблон товара",
+      message: "Например: Обувь, Очки, Ювелирные украшения. Текст всех языков возьмётся за основу из текущего открытого шаблона — потом его можно будет отредактировать.",
+      showInput: true,
+      inputPlaceholder: "Название шаблона",
+      confirmLabel: "Создать",
+      onConfirm: (name) => {
+        const id = "custom_" + Date.now();
+        const sourceLangs = getActiveLangs();
+        const size = sizeInput.value.trim() || "21*14\\26*16\\30*19 cm";
+        const langsData = {};
+        LANG_META.forEach(({ code }) => {
+          const lang = sourceLangs.find(l => l.code === code);
+          langsData[code] = { title: lang ? lang.title("") : "", body: lang ? lang.body(size) : "" };
+        });
+        customTypes.push({ id, label: name, langs: langsData });
+        saveCustomTypes();
+        rebuildProductTypes();
+        currentTypeId = id;
+        safeSet("plt_productType", currentTypeId);
+        clearOverrides();
+        renderTypeChips();
+        updateCustomTypeActionsVisibility();
+        render();
+      }
+    });
+  });
+
+  saveCustomTypeBtn.addEventListener("click", () => {
+    const ct = customTypes.find(c => c.id === currentTypeId);
+    if (!ct) return;
+    cardRefs.forEach(c => { ct.langs[c.code] = { title: c.titleInput.value, body: c.bodyTextarea.value }; });
+    saveCustomTypes();
+    rebuildProductTypes();
+    saveCustomTypeBtn.textContent = "Сохранено ✓";
+    setTimeout(() => { saveCustomTypeBtn.textContent = "Сохранить изменения в шаблон"; }, 1500);
+  });
+
+  deleteCustomTypeBtn.addEventListener("click", () => {
+    const t = PRODUCT_TYPES.find(t => t.id === currentTypeId);
+    openModal({
+      title: "Удалить шаблон?",
+      message: `Шаблон «${t ? t.label : ""}» будет удалён без возможности восстановления.`,
+      confirmLabel: "Удалить",
+      danger: true,
+      onConfirm: () => {
+        customTypes = customTypes.filter(c => c.id !== currentTypeId);
+        saveCustomTypes();
+        rebuildProductTypes();
+        currentTypeId = "bags";
+        safeSet("plt_productType", currentTypeId);
+        clearOverrides();
+        renderTypeChips();
+        updateCustomTypeActionsVisibility();
+        render();
+      }
+    });
+  });
+
+  // ---- Поделиться с коллегами: шаблоны текста ИЛИ готовое рабочее место (экспорт/импорт кодом) ----
+  const TEMPLATE_EXPORT_PREFIX = "PLT-ШАБЛОНЫ-1:";
+  const SETUP_EXPORT_PREFIX = "PLT-РАБМЕСТО-1:";
+
+  function encodeWithPrefix(prefix, data){
+    const json = JSON.stringify(data);
+    const b64 = btoa(unescape(encodeURIComponent(json)));
+    return prefix + b64;
+  }
+  function decodeWithPrefix(prefix, str){
+    const trimmed = str.trim();
+    if (!trimmed.startsWith(prefix)) throw new Error("bad-prefix");
+    const b64 = trimmed.slice(prefix.length).trim();
+    const json = decodeURIComponent(escape(atob(b64)));
+    return JSON.parse(json);
+  }
+  function infoModal(title, message){
+    openModal({ title, message, confirmLabel: "Понятно", hideCancel: true, onConfirm: () => {} });
+  }
+
+  function applyImportedTemplates(imported){
+    const valid = Array.isArray(imported) ? imported.filter(ct => ct && ct.id && ct.label && ct.langs) : [];
+    if (!valid.length){
+      infoModal("Шаблонов не найдено", "В этом коде нет ни одного шаблона для загрузки.");
+      return;
+    }
+    let added = 0, updated = 0;
+    valid.forEach(ct => {
+      const idx = customTypes.findIndex(c => c.id === ct.id);
+      if (idx === -1){ customTypes.push(ct); added++; }
+      else { customTypes[idx] = ct; updated++; }
+    });
+    saveCustomTypes();
+    rebuildProductTypes();
+    currentTypeId = valid[0].id;
+    safeSet("plt_productType", currentTypeId);
+    clearOverrides();
+    renderTypeChips();
+    updateCustomTypeActionsVisibility();
+    render();
+    const parts = [];
+    if (added) parts.push(`новых: ${added}`);
+    if (updated) parts.push(`обновлено: ${updated}`);
+    infoModal("Готово", `Загружено шаблонов — ${parts.join(", ")}. Теперь у вас то же самое, что и у коллеги.`);
+  }
+
+  function applyImportedSetup(payload){
+    if (!payload || typeof payload !== "object"){
+      infoModal("Не получилось прочитать код", "Код повреждён или создан не этой кнопкой.");
+      return;
+    }
+    if (payload.customType && payload.customType.id && payload.customType.langs){
+      const idx = customTypes.findIndex(c => c.id === payload.customType.id);
+      if (idx === -1) customTypes.push(payload.customType); else customTypes[idx] = payload.customType;
+      saveCustomTypes();
+      rebuildProductTypes();
+    }
+    if (payload.typeId && PRODUCT_TYPES.find(t => t.id === payload.typeId)){
+      currentTypeId = payload.typeId;
+      safeSet("plt_productType", currentTypeId);
+      clearOverrides();
+    }
+    if (Array.isArray(payload.visibleLangs)){
+      visibleLangs = new Set(payload.visibleLangs.filter(c => ALL_CODES.includes(c)));
+      saveVisibleLangs();
+    }
+    if (Array.isArray(payload.order)){
+      let ord = payload.order.filter(c => ALL_CODES.includes(c));
+      ALL_CODES.forEach(c => { if (!ord.includes(c)) ord.push(c); });
+      order = ord;
+      saveOrder();
+    }
+    if (Array.isArray(payload.brandLangs)){
+      brandLangs = new Set(payload.brandLangs.filter(c => ALL_CODES.includes(c)));
+      saveBrandLangs();
+    }
+    renderTypeChips();
+    updateCustomTypeActionsVisibility();
+    renderChips();
+    render();
+    const activeType = PRODUCT_TYPES.find(t => t.id === currentTypeId);
+    infoModal("Готово", `Рабочее место настроено: шаблон «${activeType ? activeType.label : ""}», стран включено — ${visibleLangs.size}. Можно сразу работать — меняются только бренд, размер и код.`);
+  }
+
+  shareTemplatesBtn.addEventListener("click", () => {
+    if (!customTypes.length){
+      infoModal("Пока нет своих шаблонов", "Сначала создайте хотя бы один шаблон кнопкой «+ Свой шаблон» — тогда его можно будет скопировать для коллег.");
+      return;
+    }
+    copyText(encodeWithPrefix(TEMPLATE_EXPORT_PREFIX, customTypes), shareTemplatesBtn);
+  });
+
+  shareSetupBtn.addEventListener("click", () => {
+    const activeType = PRODUCT_TYPES.find(t => t.id === currentTypeId);
+    const payload = {
+      typeId: currentTypeId,
+      visibleLangs: Array.from(visibleLangs),
+      order: [...order],
+      brandLangs: Array.from(brandLangs)
+    };
+    if (activeType && activeType.custom){
+      const ct = customTypes.find(c => c.id === currentTypeId);
+      if (ct) payload.customType = ct;
+    }
+    copyText(encodeWithPrefix(SETUP_EXPORT_PREFIX, payload), shareSetupBtn);
+  });
+
+  importCodeBtn.addEventListener("click", () => {
+    openModal({
+      title: "Вставить код от коллеги",
+      message: "Вставьте код, полученный от коллеги («Скопировать мои шаблоны текста» или «Скопировать готовое рабочее место»), и нажмите «Загрузить». Тип кода определится автоматически.",
+      showTextarea: true,
+      textareaPlaceholder: "PLT-… …",
+      confirmLabel: "Загрузить",
+      wide: true,
+      onConfirm: (text) => {
+        const trimmed = text.trim();
+        if (trimmed.startsWith(SETUP_EXPORT_PREFIX)){
+          try{ applyImportedSetup(decodeWithPrefix(SETUP_EXPORT_PREFIX, trimmed)); }
+          catch(e){ infoModal("Не получилось прочитать код", "Проверьте, что код скопирован полностью и без изменений."); }
+        } else if (trimmed.startsWith(TEMPLATE_EXPORT_PREFIX)){
+          try{ applyImportedTemplates(decodeWithPrefix(TEMPLATE_EXPORT_PREFIX, trimmed)); }
+          catch(e){ infoModal("Не получилось прочитать код", "Проверьте, что код скопирован полностью и без изменений."); }
+        } else {
+          infoModal("Не получилось прочитать код", "Этот код не похож на код от генератора — проверьте, что он скопирован полностью, без изменений и создан кнопками «Скопировать…» на этой странице.");
+        }
+      }
+    });
+  });
+
+  function loadOrder(){
+    const stored = safeGet("plt_order", null);
+    let ord = stored ? stored.split(",").filter(c => ALL_CODES.includes(c)) : [];
+    // добавить в конец любые языки, которых нет в сохранённом порядке (новые страны)
+    ALL_CODES.forEach(c => { if (!ord.includes(c)) ord.push(c); });
+    return ord;
+  }
+  function saveOrder(){
+    safeSet("plt_order", order.join(","));
+  }
+  function moveCode(code, targetCode){
+    if (code === targetCode) return;
+    order = order.filter(c => c !== code);
+    const idx = order.indexOf(targetCode);
+    order.splice(idx, 0, code);
+    saveOrder();
+  }
+
+  function loadBrandLangs(){
+    const stored = safeGet("plt_brandLangs", null);
+    if (stored === null) return new Set(DEFAULT_BRAND_LANGS);
+    if (stored === "") return new Set();
+    return new Set(stored.split(","));
+  }
+  function saveBrandLangs(){
+    safeSet("plt_brandLangs", Array.from(brandLangs).join(","));
+  }
+
+  function loadVisibleLangs(){
+    const stored = safeGet("plt_visibleLangs", null);
+    if (stored === null) { safeSet("plt_knownLangs", ALL_CODES.join(",")); return new Set(ALL_CODES); }
+    const set = stored === "" ? new Set() : new Set(stored.split(","));
+    // новые страны (которых раньше не было в списке) сразу включаем — чтобы их было видно
+    const known = (safeGet("plt_knownLangs", null) || "HU,DE,PT,ES,NL,PL,RO,HR,CZ").split(",");
+    ALL_CODES.forEach(c => { if (!known.includes(c)) set.add(c); });
+    safeSet("plt_knownLangs", ALL_CODES.join(","));
+    safeSet("plt_visibleLangs", Array.from(set).join(","));
+    return set;
+  }
+  function saveVisibleLangs(){
+    safeSet("plt_visibleLangs", Array.from(visibleLangs).join(","));
+  }
+
+  function loadCollapsedLangs(){
+    const stored = safeGet("plt_collapsedLangs", null);
+    if (stored === null || stored === "") return new Set();
+    return new Set(stored.split(","));
+  }
+  function saveCollapsedLangs(){
+    safeSet("plt_collapsedLangs", Array.from(collapsedLangs).join(","));
+  }
+
+  function setCardCollapsed(code, collapsed){
+    const card = document.getElementById(`card-${code}`);
+    if (!card) return;
+    card.classList.toggle("collapsed", collapsed);
+    const btn = card.querySelector(".card-collapse-btn");
+    if (btn) btn.textContent = collapsed ? "▸" : "▾";
+    if (collapsed) collapsedLangs.add(code); else collapsedLangs.delete(code);
+  }
+
+  function renderNav(){
+    navLinks.innerHTML = "";
+    const activeLangs = getActiveLangs();
+    order
+      .map(c => activeLangs.find(l => l.code === c))
+      .filter(lang => lang && visibleLangs.has(lang.code))
+      .forEach(lang => {
+      const link = document.createElement("button");
+      link.type = "button";
+      link.className = "nav-link";
+      link.textContent = lang.name;
+      link.addEventListener("click", () => {
+        setCardCollapsed(lang.code, false);
+        saveCollapsedLangs();
+        const card = document.getElementById(`card-${lang.code}`);
+        if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      navLinks.appendChild(link);
+    });
+  }
+
+  resetOrderBtn.addEventListener("click", () => {
+    order = [...ALL_CODES];
+    saveOrder();
+    render();
+  });
+
+  collapseAllBtn.addEventListener("click", () => {
+    cardRefs.forEach(c => setCardCollapsed(c.code, true));
+    saveCollapsedLangs();
+  });
+  expandAllBtn.addEventListener("click", () => {
+    cardRefs.forEach(c => setCardCollapsed(c.code, false));
+    saveCollapsedLangs();
+  });
+
+  function renderChips(){
+    langChips.innerHTML = "";
+    getActiveLangs().forEach(lang => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "lang-chip" + (visibleLangs.has(lang.code) ? " active" : "");
+      chip.innerHTML = `<span class="dot"></span>${lang.name}`;
+      chip.addEventListener("click", () => {
+        if (visibleLangs.has(lang.code)) visibleLangs.delete(lang.code);
+        else visibleLangs.add(lang.code);
+        saveVisibleLangs();
+        renderChips();
+        render();
+      });
+      langChips.appendChild(chip);
+    });
+  }
+
+  langsAllBtn.addEventListener("click", () => {
+    visibleLangs = new Set(ALL_CODES);
+    saveVisibleLangs();
+    renderChips();
+    render();
+  });
+  langsNoneBtn.addEventListener("click", () => {
+    visibleLangs = new Set();
+    saveVisibleLangs();
+    renderChips();
+    render();
+  });
+
+  function safeGet(key, fallback){
+    try{ return localStorage.getItem(key) ?? fallback; }catch(e){ return fallback; }
+  }
+  function safeSet(key, val){
+    try{ localStorage.setItem(key, val); }catch(e){}
+  }
+
+  function titleWithCode(lang, brand, code){
+    const base = lang.title(brand);
+    return code ? `${base} ${code}` : base;
+  }
+
+  function fullText(lang, brand, size, code){
+    return `${titleWithCode(lang, brand, code)}\n\n${lang.body(size)}`;
+  }
+
+  function autoResize(ta){
+    ta.style.height = "auto";
+    ta.style.height = ta.scrollHeight + "px";
+  }
+
+  async function copyText(text, btn){
+    let ok = false;
+    try{
+      await navigator.clipboard.writeText(text);
+      ok = true;
+    }catch(e){
+      try{
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+        ok = true;
+      }catch(e2){ ok = false; }
+    }
+    if(btn){
+      const original = btn.textContent;
+      btn.textContent = ok ? "Скопировано ✓" : "Не удалось";
+      btn.classList.toggle("copied", ok);
+      setTimeout(() => { btn.textContent = original; btn.classList.remove("copied"); }, 1500);
+    }
+  }
+
+  function render(){
+    const brand = brandInput.value.trim();
+    const size = sizeInput.value.trim() || "21*14\\26*16\\30*19 cm";
+    const code = codeInput.value.trim();
+    const priceZlRaw = priceZlInput.value.trim();
+    safeSet("plt_brand", brand);
+    safeSet("plt_size", size);
+    safeSet("plt_code", code);
+    safeSet("plt_priceZl", priceZlRaw);
+    const priceZlNum = parseFloat(priceZlRaw.replace(",", "."));
+
+    grid.innerHTML = "";
+    cardRefs = [];
+    const activeLangs = getActiveLangs();
+    const orderedLangs = order
+      .map(c => activeLangs.find(l => l.code === c))
+      .filter(lang => lang && visibleLangs.has(lang.code));
+    orderedLangs.forEach(lang => {
+      const effectiveBrand = brandLangs.has(lang.code) ? brand : "";
+      const overrideK = overrideKey(lang.code);
+      const autoTitle = titleWithCode(lang, effectiveBrand, code);
+      const autoBody = lang.body(size);
+      const hasTitleOverride = titleOverrides.hasOwnProperty(overrideK);
+      const hasBodyOverride = bodyOverrides.hasOwnProperty(overrideK);
+      // Австрия/Бельгия без своей правки повторяют правку Германии/Нидерландов (ничего не сохраняем за них)
+      const fbK = LANG_FALLBACK[lang.code] ? currentTypeId + ":" + LANG_FALLBACK[lang.code] : null;
+      const fbTitle = !hasTitleOverride && fbK && titleOverrides[fbK];
+      const fbBody = !hasBodyOverride && fbK && bodyOverrides[fbK];
+      let titleText, bodyText;
+      if (hasTitleOverride){
+        // Хранится только сама формулировка (без кода — код всегда добавляется в конец
+        // отдельно, как и в автотексте), поэтому код подтягивается сразу, даже если
+        // его не было в тексте на момент правки.
+        const ov = titleOverrides[overrideK];
+        const base = substituteInOverride(ov.base, ov.brand, effectiveBrand);
+        titleOverrides[overrideK] = { base, brand: effectiveBrand };
+        // Защита от задвоения: если формулировка уже сама заканчивается на этот код
+        // (человек мог напечатать его вручную как часть текста), второй раз не добавляем.
+        titleText = (code && !base.endsWith(" " + code)) ? `${base} ${code}` : base;
+      } else if (fbTitle && fbTitle.base != null){
+        const base = substituteInOverride(fbTitle.base, fbTitle.brand, effectiveBrand);
+        titleText = (code && !base.endsWith(" " + code)) ? `${base} ${code}` : base;
+      } else {
+        titleText = autoTitle;
+      }
+      if (hasBodyOverride){
+        const ov = bodyOverrides[overrideK];
+        const text = substituteInOverride(ov.text, ov.size, size);
+        bodyOverrides[overrideK] = { text, size };
+        bodyText = text;
+      } else if (fbBody && fbBody.text != null){
+        bodyText = substituteInOverride(fbBody.text, fbBody.size, size);
+      } else {
+        bodyText = autoBody;
+      }
+      const card = document.createElement("div");
+      card.className = "card";
+      card.id = `card-${lang.code}`;
+      // Перетаскивание разрешено только за ручку ⠿ (ниже), а не за всю карточку —
+      // иначе попытка выделить текст мышкой для копирования сдвигала бы карточку.
+      if (collapsedLangs.has(lang.code)) card.classList.add("collapsed");
+
+      card.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        if (dragCode && dragCode !== lang.code) card.classList.add("drag-over");
+      });
+      card.addEventListener("dragleave", () => card.classList.remove("drag-over"));
+      card.addEventListener("drop", (e) => {
+        e.preventDefault();
+        card.classList.remove("drag-over");
+        if (dragCode && dragCode !== lang.code) {
+          moveCode(dragCode, lang.code);
+          render();
+        }
+        dragCode = null;
+      });
+
+      card.addEventListener("mouseenter", () => { hoveredCode = lang.code; card.classList.add("hovered"); });
+      card.addEventListener("mouseleave", () => { if (hoveredCode === lang.code) hoveredCode = null; card.classList.remove("hovered"); });
+
+      const head = document.createElement("div");
+      head.className = "card-head";
+      head.innerHTML = `<span class="drag-handle" draggable="true" title="Перетащи, чтобы изменить порядок">⠿</span><span class="lang-name">${lang.name} <span class="lang-code">${lang.code}</span><span class="copied-badge" title="Скопировано в этом сеансе">✓</span></span>`;
+
+      const dragHandle = head.querySelector(".drag-handle");
+      dragHandle.addEventListener("dragstart", (e) => {
+        dragCode = lang.code;
+        card.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+        try { e.dataTransfer.setData("text/plain", lang.code); } catch (err) {}
+      });
+      dragHandle.addEventListener("dragend", () => {
+        card.classList.remove("dragging");
+        grid.querySelectorAll(".card.drag-over").forEach(c => c.classList.remove("drag-over"));
+      });
+
+      const collapseBtn = document.createElement("button");
+      collapseBtn.type = "button";
+      collapseBtn.className = "card-collapse-btn";
+      collapseBtn.textContent = collapsedLangs.has(lang.code) ? "▸" : "▾";
+      collapseBtn.title = "Свернуть/развернуть карточку";
+      collapseBtn.addEventListener("click", () => {
+        const willCollapse = !card.classList.contains("collapsed");
+        setCardCollapsed(lang.code, willCollapse);
+        saveCollapsedLangs();
+      });
+      head.appendChild(collapseBtn);
+
+      const copyCombinedBtn = document.createElement("button");
+      copyCombinedBtn.className = "copy-btn copy-both";
+      copyCombinedBtn.type = "button";
+      copyCombinedBtn.textContent = "Скопировать всё → 1 клик на сайте";
+      copyCombinedBtn.title = "Копирует название и описание одним куском, чтобы кнопка на сайте разложила их по полям сама";
+      head.appendChild(copyCombinedBtn);
+
+      const brandToggleRow = document.createElement("label");
+      brandToggleRow.className = "brand-toggle-row";
+      brandToggleRow.innerHTML = `<span class="switch small"><input type="checkbox" data-lang="${lang.code}"${brandLangs.has(lang.code) ? " checked" : ""}><span class="slider"></span></span>бренд`;
+      brandToggleRow.querySelector("input").addEventListener("change", (e) => {
+        if (e.target.checked) brandLangs.add(lang.code); else brandLangs.delete(lang.code);
+        saveBrandLangs();
+        render();
+      });
+      head.appendChild(brandToggleRow);
+
+      card.appendChild(head);
+
+      const details = document.createElement("div");
+      details.className = "card-details";
+
+      // Title block — editable
+      const titleBlock = document.createElement("div");
+      titleBlock.className = "block title-block";
+      const titleHead = document.createElement("div");
+      titleHead.className = "block-head";
+      titleHead.innerHTML = `<span class="block-label">Название (можно править)</span>`;
+      const titleResetBtn = document.createElement("button");
+      titleResetBtn.type = "button";
+      titleResetBtn.className = "copy-btn reset-btn" + (hasTitleOverride ? "" : " hidden");
+      titleResetBtn.title = "Вернуть автоматический текст (сброс ручной правки)";
+      titleResetBtn.textContent = "↺ Авто";
+      titleHead.appendChild(titleResetBtn);
+      const titleCopyBtn = document.createElement("button");
+      titleCopyBtn.className = "copy-btn";
+      titleCopyBtn.textContent = "Копировать";
+      titleHead.appendChild(titleCopyBtn);
+      const titleInput = document.createElement("input");
+      titleInput.type = "text";
+      titleInput.className = "title-input";
+      titleInput.value = titleText;
+      titleBlock.appendChild(titleHead);
+      titleBlock.appendChild(titleInput);
+      details.appendChild(titleBlock);
+
+      titleInput.addEventListener("input", () => {
+        const liveBrand = brandLangs.has(lang.code) ? brandInput.value.trim() : "";
+        const liveCode = codeInput.value.trim();
+        let base = titleInput.value;
+        // Если человек напечатал код в конце текста так же, как его добавляет автогенерация
+        // ("... " + код), отделяем его от сохранённой формулировки — код и так будет
+        // подставляться в конец автоматически при следующей генерации.
+        if (liveCode && base.endsWith(" " + liveCode)) {
+          base = base.slice(0, base.length - (" " + liveCode).length);
+        }
+        titleOverrides[overrideK] = { base, brand: liveBrand };
+        saveOverrides();
+        titleResetBtn.classList.remove("hidden");
+      });
+      titleResetBtn.addEventListener("click", () => {
+        delete titleOverrides[overrideK];
+        saveOverrides();
+        titleInput.value = titleWithCode(lang, effectiveBrand, codeInput.value.trim());
+        titleResetBtn.classList.add("hidden");
+      });
+
+      details.appendChild(document.createElement("hr")).className = "divider";
+
+      // Description block — editable
+      const bodyBlock = document.createElement("div");
+      bodyBlock.className = "block";
+      const bodyHead = document.createElement("div");
+      bodyHead.className = "block-head";
+      bodyHead.innerHTML = `<span class="block-label">Описание (можно править)</span>`;
+      const bodyResetBtn = document.createElement("button");
+      bodyResetBtn.type = "button";
+      bodyResetBtn.className = "copy-btn reset-btn" + (hasBodyOverride ? "" : " hidden");
+      bodyResetBtn.title = "Вернуть автоматический текст (сброс ручной правки)";
+      bodyResetBtn.textContent = "↺ Авто";
+      bodyHead.appendChild(bodyResetBtn);
+      const bodyCopyBtn = document.createElement("button");
+      bodyCopyBtn.className = "copy-btn";
+      bodyCopyBtn.textContent = "Копировать";
+      bodyHead.appendChild(bodyCopyBtn);
+      const bodyTextarea = document.createElement("textarea");
+      bodyTextarea.className = "body-textarea";
+      bodyTextarea.value = bodyText;
+      bodyTextarea.rows = 1;
+      bodyBlock.appendChild(bodyHead);
+      bodyBlock.appendChild(bodyTextarea);
+      details.appendChild(bodyBlock);
+
+      bodyResetBtn.addEventListener("click", () => {
+        delete bodyOverrides[overrideK];
+        saveOverrides();
+        bodyTextarea.value = lang.body(sizeInput.value.trim() || "21*14\\26*16\\30*19 cm");
+        bodyResetBtn.classList.add("hidden");
+        autoResize(bodyTextarea);
+      });
+
+      // Price block — автоматически конвертируется из цены в злотых при каждой
+      // генерации (пересчитывается заново, как код/размер, без ручных правок —
+      // источник истины всегда поле «Цена (PLN)» наверху).
+      details.appendChild(document.createElement("hr")).className = "divider";
+      const priceInfo = convertPriceForLang(priceZlNum, lang.code);
+      const priceBlock = document.createElement("div");
+      priceBlock.className = "block";
+      const priceHead = document.createElement("div");
+      priceHead.className = "block-head";
+      priceHead.innerHTML = `<span class="block-label">Цена${priceInfo ? " (" + priceInfo.currency + ")" : ""}</span>`;
+      const priceCopyBtn = document.createElement("button");
+      priceCopyBtn.className = "copy-btn";
+      priceCopyBtn.textContent = "Копировать";
+      priceHead.appendChild(priceCopyBtn);
+      const priceInput = document.createElement("input");
+      priceInput.type = "text";
+      priceInput.className = "title-input";
+      priceInput.value = priceInfo ? String(priceInfo.value) : "";
+      priceInput.placeholder = "введите цену в PLN выше";
+      priceBlock.appendChild(priceHead);
+      priceBlock.appendChild(priceInput);
+      details.appendChild(priceBlock);
+
+      card.appendChild(details);
+      grid.appendChild(card);
+
+      // Wire up copy buttons to read the CURRENT (possibly edited) values
+      titleCopyBtn.addEventListener("click", () => { copyText(titleInput.value, titleCopyBtn); card.classList.add("card-copied"); });
+      bodyCopyBtn.addEventListener("click", () => { copyText(bodyTextarea.value, bodyCopyBtn); card.classList.add("card-copied"); });
+      priceCopyBtn.addEventListener("click", () => { copyText(priceInput.value, priceCopyBtn); card.classList.add("card-copied"); });
+      copyCombinedBtn.addEventListener("click", () => {
+        // Цена подмешивается меткой @@PRICE@@ в конец — скрипт-вставка на сайте
+        // её распознаёт и вставляет отдельно в поле цены, а не в описание.
+        const priceSuffix = priceInput.value.trim() ? `\n\n@@PRICE@@${priceInput.value.trim()}` : "";
+        copyText(`${titleInput.value}\n\n${bodyTextarea.value}${priceSuffix}`, copyCombinedBtn);
+        card.classList.add("card-copied");
+      });
+
+      bodyTextarea.addEventListener("input", () => {
+        const liveSize = sizeInput.value.trim() || "21*14\\26*16\\30*19 cm";
+        bodyOverrides[overrideK] = { text: bodyTextarea.value, size: liveSize };
+        saveOverrides();
+        bodyResetBtn.classList.remove("hidden");
+        autoResize(bodyTextarea);
+      });
+      autoResize(bodyTextarea);
+
+      cardRefs.push({ code: lang.code, name: lang.name, titleInput, bodyTextarea, priceInput, copyCombinedBtn, titleCopyBtn, bodyCopyBtn, priceCopyBtn });
+    });
+
+    if (visibleLangs.size === 0) {
+      const empty = document.createElement("p");
+      empty.className = "lede";
+      empty.textContent = "Все страны скрыты — включите нужные кнопками выше.";
+      grid.appendChild(empty);
+    }
+
+    saveOverrides();
+    renderNav();
+  }
+
+  function escapeHtml(s){
+    return s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  }
+
+  form.addEventListener("submit", (e) => { e.preventDefault(); render(); });
+
+  codePlusOneBtn.addEventListener("click", () => {
+    const val = codeInput.value.trim();
+    const match = val.match(/(\d+)$/);
+    if (match) {
+      const numStr = match[1];
+      const incremented = String(parseInt(numStr, 10) + 1).padStart(numStr.length, "0");
+      codeInput.value = val.slice(0, val.length - numStr.length) + incremented;
+    } else {
+      codeInput.value = val ? val + " 1" : "1";
+    }
+    render();
+  });
+
+  // Каждый блок помечается машиночитаемым кодом языка ###XX### — скрипт-вставка
+  // на сайте (paste-panel-userscript) распознаёт его и сам находит нужную страну,
+  // не заставляя возвращаться сюда и копировать по одной.
+  copyAllBtn.addEventListener("click", () => {
+    const all = cardRefs.map(c => {
+      const priceSuffix = c.priceInput.value.trim() ? `\n\n@@PRICE@@${c.priceInput.value.trim()}` : "";
+      return `###${c.code}### ${c.name.toUpperCase()}\n${c.titleInput.value}\n\n${c.bodyTextarea.value}${priceSuffix}`;
+    }).join("\n\n");
+    copyText(all, copyAllBtn);
+  });
+
+  // Горячие клавиши 1/2/3 — работают на карточке под курсором мыши,
+  // но отключены, пока курсор фокуса стоит в текстовом поле (чтобы не мешать вводу цифр).
+  document.addEventListener("keydown", (e) => {
+    if (!["1", "2", "3"].includes(e.key)) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA") return;
+    if (!hoveredCode) return;
+    const c = cardRefs.find(c => c.code === hoveredCode);
+    if (!c) return;
+    e.preventDefault();
+    if (e.key === "1") c.copyCombinedBtn.click();
+    else if (e.key === "2") c.titleCopyBtn.click();
+    else if (e.key === "3") c.bodyCopyBtn.click();
+  });
+
+  const params = new URLSearchParams(location.search);
+  const fromUrl = params.has("brand") || params.has("size") || params.has("code");
+
+  brandInput.value = params.has("brand") ? params.get("brand") : safeGet("plt_brand", "");
+  sizeInput.value = params.get("size") || safeGet("plt_size", "21*14\\26*16\\30*19 cm");
+  codeInput.value = params.get("code") || safeGet("plt_code", "");
+  priceZlInput.value = params.get("price") || safeGet("plt_priceZl", "");
+  brandLangs = loadBrandLangs();
+  visibleLangs = loadVisibleLangs();
+  collapsedLangs = loadCollapsedLangs();
+  order = loadOrder();
+  loadOverrides();
+  renderTypeChips();
+  updateCustomTypeActionsVisibility();
+  renderChips();
+  render();
+
+  if (fromUrl && cardRefs.length) {
+    const note = document.createElement("p");
+    note.className = "lede";
+    note.style.color = "var(--ok)";
+    note.textContent = "Поля заполнены автоматически со страницы товара — название первой видимой страны уже скопировано, вставляйте.";
+    document.querySelector("main > div").appendChild(note);
+
+    copyText(cardRefs[0].titleInput.value, null);
+  }
+})();
+</script>
+
+</body></html>
+</body></html>
