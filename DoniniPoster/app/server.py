@@ -1126,6 +1126,55 @@ def create_app(engine):
         engine.log(f"🧾 «{ln['name']}»: шаблон текста — {tpl}")
         return {"ok": True}
 
+    @app.post("/api/queue/sizes_from_site")
+    async def sizes_from_site(req: Request):
+        """Товары, скачанные с моего сайта, без размера в очереди: берём размер с сайта заново (описание, «Wymiary», атрибуты)."""
+        from . import sources
+        d = await req.json()
+        ids = set(d.get("ids") or [])
+        try:
+            woo = _woo_mod().Woo(engine.cfg)
+        except Exception as e:
+            raise HTTPException(400, f"Сайт не подключён: {e}")
+        by_folder = {}
+        for wid, folder in sources._seen().items():
+            by_folder.setdefault(folder, wid)
+        todo = []
+        for p in engine.state["products"].values():
+            if p["status"] == "archived" or (ids and p["id"] not in ids) or (not ids and (p.get("size") or "").strip()):
+                continue
+            wid = by_folder.get(Path(p.get("folder") or "").name)
+            if wid:
+                todo.append((p, wid))
+        w = engine.cfg.get("woo") or {}
+
+        def run():
+            ok = miss = 0
+            for p, wid in todo:
+                try:
+                    wp = woo.wc(f"products/{int(wid)}")
+                    size = sources.product_info(wp, w)[1]
+                except Exception as e:
+                    engine.log(f"⚠️ Размер с сайта для {p.get('code')}: {e}")
+                    miss += 1
+                    continue
+                if not size:
+                    miss += 1
+                    continue
+                p["size"] = size if "cm" in size.lower() else size + " cm"
+                try:  # и в info.txt папки — чтобы размер не потерялся
+                    f = Path(p["folder"]) / "info.txt"
+                    lines = [x for x in (f.read_text("utf-8").splitlines() if f.exists() else []) if not x.lower().startswith("размер")]
+                    f.write_text("\n".join([f"размер: {p['size']}"] + lines) + "\n", "utf-8")
+                except OSError:
+                    pass
+                ok += 1
+            return ok, miss
+        ok, miss = await asyncio.to_thread(run)
+        engine.save()
+        engine.log(f"📏 Размер с сайта: подставлен у {ok} товаров" + (f", не найден у {miss}" if miss else ""))
+        return {"ok": True, "done": ok, "missing": miss, "candidates": len(todo)}
+
     @app.post("/api/queue/texts_reset")
     async def queue_texts_reset(req: Request):
         """Кнопка «Тексты по шаблону»: у товаров в очереди убираются свои тексты — всё берётся из шаблона заново."""

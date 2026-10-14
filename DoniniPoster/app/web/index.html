@@ -308,6 +308,7 @@
         <select id="qStateFilter"><option value="">все</option><option value="error">только с ошибками</option></select>
         <label class="switch small"><input type="checkbox" class="showHistory"> показать выставленные</label>
         <button class="sm" id="syncManager" title="Шаблоны текстов — встроенный Donini Manager, правки применяются сразу">🧾 Шаблоны</button>
+        <button class="sm" id="sizesFromSite" title="Товарам, скачанным с моего сайта, у которых нет размера, — подставить размер с сайта">📏 Размеры с сайта</button>
         <button class="sm" data-tplreset="boards" title="Все товары в очереди — с текстом из текущего шаблона (убрать свои тексты ✏️)">↺ Тексты по шаблону</button>
         <button class="sm danger" data-clear="boards">🗑 Очистить</button>
       </span></h3>
@@ -880,6 +881,15 @@ $("#brandStrip").addEventListener("click", async e => {
   toast(`${s.name}: ${!s.title_brand ? "🏷 теперь С брендом" : "🚫 теперь БЕЗ бренда"}`);
   refresh();
 });
+$("#sizesFromSite").onclick = async () => {
+  const b = $("#sizesFromSite"); b.disabled = true; const old = b.textContent; b.textContent = "📏 Беру размеры с сайта…";
+  try{
+    const ids = [...SEL].filter(id => S.products.some(p => p.id === id && p.line !== "site"));
+    const r = await post("/api/queue/sizes_from_site", {ids});
+    if(!r.candidates) toast("Нет товаров без размера, скачанных с моего сайта");
+    else toast(`📏 Размер подставлен: ${r.done}${r.missing ? ` · не найден на сайте: ${r.missing}` : ""}`, !!r.missing && !r.done);
+  }catch(e){} finally{ b.disabled = false; b.textContent = old; refresh(); }
+};
 $$("[data-tplreset]").forEach(b => b.onclick = async () => {
   const mode = b.dataset.tplreset, lineF = mode === "boards" ? $("#qLineFilter").value : "";
   const own = S.products.filter(p => p.status !== "archived" && (p.line === "site") === (mode === "site") && (!lineF || p.line === lineF) && p.texts && Object.keys(p.texts).length);
