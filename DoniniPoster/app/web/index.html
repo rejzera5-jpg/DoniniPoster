@@ -244,6 +244,7 @@
   <div class="card">
     <h3><span>Очередь сайта</span>
       <span class="row"><label class="switch small"><input type="checkbox" class="showHistory"> показать загруженные</label>
+      <button class="sm" data-tplreset="site" title="Все товары в очереди — с текстом из текущего шаблона (убрать свои тексты ✏️)">↺ Тексты по шаблону</button>
       <button class="sm danger" data-clear="site">🗑 Очистить</button></span></h3>
     <div id="bulkSite"></div>
     <div id="qSite"></div>
@@ -296,6 +297,7 @@
         <select id="qStateFilter"><option value="">все</option><option value="error">только с ошибками</option></select>
         <label class="switch small"><input type="checkbox" class="showHistory"> показать выставленные</label>
         <button class="sm" id="syncManager" title="Шаблоны текстов — встроенный Donini Manager, правки применяются сразу">🧾 Шаблоны</button>
+        <button class="sm" data-tplreset="boards" title="Все товары в очереди — с текстом из текущего шаблона (убрать свои тексты ✏️)">↺ Тексты по шаблону</button>
         <button class="sm danger" data-clear="boards">🗑 Очистить</button>
       </span></h3>
     <div id="siteStrip" class="chips"></div>
@@ -825,7 +827,7 @@ function renderQueue(siteMode){
         <td><img class="thumb" loading="lazy" src="/api/thumb?path=${encodeURIComponent(p.photos[0]||"")}" data-act="photos" data-pid="${p.id}" style="cursor:zoom-in" title="Посмотреть фото (можно убрать лишние)"></td>
         <td><span class="code">${esc(p.code)}</span></td>
         <td style="max-width:340px"><a data-act="card" data-pid="${p.id}" style="cursor:pointer">${esc(p.name)}</a>
-          <div class="small muted">${esc(lines[p.line]?.name || p.line)} · <span title="Шаблон текста объявления">🧾 ${esc(tpl(lines[p.line]))}</span> · ${p.photos.length} фото${p.photos_locked ? " · фото выбраны" : ""}
+          <div class="small muted">${esc(lines[p.line]?.name || p.line)} · <span title="Шаблон текста объявления">🧾 ${esc(tpl(lines[p.line]))}</span> · ${p.photos.length} фото${p.photos_locked ? " · фото выбраны" : ""}${p.texts && Object.keys(p.texts).length ? ` · <span class="warn" title="Текст поправлен вручную — шаблон к нему не применяется. «↺ Тексты по шаблону» — вернуть шаблон">✏️ свой текст</span>` : ""}
             ${archived ? (p.no_brand ? " · без бренда" : "") : `<button class="sm brandtg ${p.no_brand ? "off" : "on"}" data-act="brand" data-pid="${p.id}" title="${p.no_brand ? "Сейчас: БЕЗ бренда — бренд не пишется ни в названии, ни в описании. Нажмите — включить" : "Сейчас: С брендом (на сайтах, где включено «бренд в название»). Нажмите — выгружать без бренда"}">${p.no_brand ? "🚫 без бренда" : "🏷 с брендом" + (p.brand ? ": " + esc(p.brand) : "")}</button>`}</div></td>
         <td>${archived ? esc(p.size) : `<input class="mini" data-edit="size" data-pid="${p.id}" value="${esc(p.size)}">`}</td>
         <td>${archived ? esc(p.price) : `<input class="tiny" data-edit="price" data-pid="${p.id}" value="${esc(p.price || "")}">`}</td>
@@ -842,6 +844,14 @@ function renderQueue(siteMode){
 $$(".showHistory").forEach(c => c.onchange = (e) => { showHist = e.target.checked; $$(".showHistory").forEach(x => x.checked = showHist); refresh(); });
 $("#qLineFilter").onchange = () => render(true);
 $("#qStateFilter").onchange = () => render(true);
+$$("[data-tplreset]").forEach(b => b.onclick = async () => {
+  const mode = b.dataset.tplreset, lineF = mode === "boards" ? $("#qLineFilter").value : "";
+  const own = S.products.filter(p => p.status !== "archived" && (p.line === "site") === (mode === "site") && (!lineF || p.line === lineF) && p.texts && Object.keys(p.texts).length);
+  if(!own.length){ toast("✓ Все товары в очереди уже берут текст из шаблона — изменения в Donini Manager применяются к ним сами"); return; }
+  if(!confirm(`У ${own.length} товаров в очереди свой текст (поправлен вручную через ✏️) — поэтому изменения шаблона к ним не применялись.\n\nЗаменить их тексты текущим шаблоном?`)) return;
+  const r = await post("/api/queue/texts_reset", {only: mode, line: lineF});
+  toast(`✓ Тексты по шаблону: ${r.reset} товаров`); refresh();
+});
 $$("[data-clear]").forEach(b => b.onclick = async () => {
   const mode = b.dataset.clear;
   const n = S.products.filter(p => p.status !== "archived" && (p.line === "site") === (mode === "site")).length;
@@ -1729,6 +1739,7 @@ function renderBulk(siteMode, rows){
     <select data-bulksel="line"><option value="">➡ Перенести в вид товара…</option>${lineOpts}</select>
     <button class="sm" data-bulk="price">💰 Цена…</button>
     <button class="sm" data-bulk="size">📏 Размер…</button>
+    <button class="sm" data-bulk="texts_reset" title="Убрать свои тексты (✏️) — снова текст из шаблона">↺ Текст по шаблону</button>
     <button class="sm" data-bulk="brand_on" title="Выбранные товары — с брендом">🏷 С брендом</button>
     <button class="sm" data-bulk="brand_off" title="Выбранные товары — без бренда (бренд не пишется нигде)">🚫 Без бренда</button>
     <button class="sm danger" data-bulk="remove">🗑 Убрать</button>

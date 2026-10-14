@@ -1003,6 +1003,8 @@ def create_app(engine):
                     raise HTTPException(400, "Цена — число")
             elif act == "size":
                 p["size"] = str(val or "").strip()
+            elif act == "texts_reset":  # свой текст убрать — снова по шаблону (Donini Manager)
+                p.pop("texts", None)
             elif act == "brand_on":
                 p.pop("no_brand", None)
             elif act == "brand_off":
@@ -1013,7 +1015,7 @@ def create_app(engine):
                 raise HTTPException(400, "Неизвестное действие")
             n += 1
         engine.save()
-        engine.log(f"✔ Выбранные товары ({n}): {({'retry': 'повтор ошибок', 'line': 'перенесены в другой вид', 'price': 'новая цена', 'size': 'новый размер', 'top': 'выставляются первыми', 'brand_on': 'с брендом', 'brand_off': 'без бренда'}).get(act, act)}")
+        engine.log(f"✔ Выбранные товары ({n}): {({'retry': 'повтор ошибок', 'line': 'перенесены в другой вид', 'price': 'новая цена', 'size': 'новый размер', 'top': 'выставляются первыми', 'texts_reset': 'тексты снова по шаблону', 'brand_on': 'с брендом', 'brand_off': 'без бренда'}).get(act, act)}")
         return {"ok": True, "done": n}
 
     # ---------- свой текст товара (перед выгрузкой) ----------
@@ -1044,6 +1046,22 @@ def create_app(engine):
         hits.sort(key=lambda h: (not h["_exact"], h["added"] or ""), reverse=False)
         exact_first = [h for h in hits if h["_exact"]] + sorted([h for h in hits if not h["_exact"]], key=lambda h: h["added"] or "", reverse=True)
         return {"items": exact_first[:30], "total": len(hits)}
+
+    @app.post("/api/queue/texts_reset")
+    async def queue_texts_reset(req: Request):
+        """Кнопка «Тексты по шаблону»: у товаров в очереди убираются свои тексты — всё берётся из шаблона заново."""
+        d = await req.json()
+        site_mode = d.get("only") == "site"
+        line = d.get("line") or ""
+        n = 0
+        for p in engine.state["products"].values():
+            if p["status"] == "archived" or (p.get("line") == "site") != site_mode or (line and p.get("line") != line):
+                continue
+            if p.pop("texts", None):
+                n += 1
+        engine.save()
+        engine.log(f"🧾 Тексты по шаблону: обновлено товаров с своим текстом — {n}, остальные и так берутся из шаблона")
+        return {"ok": True, "reset": n}
 
     @app.get("/api/product/{pid}/texts")
     async def product_texts(pid: str):
@@ -1237,6 +1255,9 @@ def create_app(engine):
         if changed:
             engine.log(f"🔄 Синхронизировано с Donini Manager: шаблонов {len(items)}, правок названий "
                        f"{len(ov['titleOverrides'])}, описаний {len(ov['bodyOverrides'])}")
+            own = sum(1 for p in engine.state["products"].values() if p["status"] != "archived" and p.get("texts"))
+            if own:
+                engine.log(f"ℹ️ У {own} товаров в очереди свой текст (✏️) — он важнее шаблона. Чтобы взять новый шаблон: «🧾 Тексты по шаблону»")
         return {"ok": True, "changed": changed}
 
     @app.post("/api/templates/import")
