@@ -4,6 +4,7 @@ import json
 import re
 import shutil
 import threading
+import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -53,13 +54,22 @@ def _clean(s):
     return re.sub(r"\s+", " ", s).strip(" .")
 
 
-def _fetch(url, path):
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 DoniniPoster"})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        data = r.read()
-    if len(data) < 500:
-        raise IOError("пустой файл")
-    path.write_bytes(data)
+def _fetch(url, path, tries=3):
+    """Скачивает фото. Сайт иногда «подвисает» на одном фото — тогда не ждём минуту, а пробуем ещё раз."""
+    err = None
+    for k in range(tries):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 DoniniPoster"})
+            with urllib.request.urlopen(req, timeout=15 + 10 * k) as r:
+                data = r.read()
+            if len(data) < 500:
+                raise IOError("пустой файл")
+            path.write_bytes(data)
+            return
+        except Exception as e:
+            err = e
+            time.sleep(1 + k)
+    raise err
 
 
 def pull_from_woo(woo, cfg, line, category="", search="", limit=50, only_new=True, log=print):
@@ -135,18 +145,21 @@ def _pull_one(p, w, base, log):
         (tmp / "info.txt").write_text("\n".join(info) + "\n", "utf-8")
         (tmp / "с сайта.txt").write_text(f"{p.get('name')}\n{p.get('permalink')}\n", "utf-8")
         (tmp / ".ready").write_text("", "utf-8")
-        final, n = base / name, 2
-        while final.exists():
-            final, n = base / f"{name} ({n})", n + 1
-        tmp.rename(final)
         with _lock:
+            final, n = base / name, 2
+            while final.exists():
+                final, n = base / f"{name} ({n})", n + 1
+            tmp.rename(final)
             seen = _seen()
             seen[str(p.get("id"))] = final.name
             _save_seen(seen)
-        STATE["done"] += 1
+        with _lock:
+            STATE["done"] += 1
         return True
     except Exception as e:
-        STATE["errors"] += 1
+        shutil.rmtree(base / f"_загрузка_сайт_{p.get('id')}", ignore_errors=True)
+        with _lock:
+            STATE["errors"] += 1
         log(f"⚠️ С сайта: товар «{p.get('name')}» не скачался: {e}")
         return False
 
@@ -163,35 +176,66 @@ def pull_ids(woo, cfg, line, ids, log=print, resolve=None):
             return
         STATE.update(running=True, done=0, total=len(ids), skipped=0, errors=0, stop=False, msg="", done_ids={}, failed_ids=[])
     w = cfg.get("woo") or {}
-    try:
+
+    def one(ln, pid, rs):
+        p = None
+        for k in range(2):
+            try:
+                p = woo.wc(f"products/{int(pid)}")
+                break
+            except Exception as e:
+                if k:
+                    with _lock:
+                        STATE["errors"] += 1
+                        STATE.setdefault("failed_ids", []).append(str(pid))
+                    log(f"⚠️ С сайта: товар {pid} не получен: {e}")
+                    return
+                time.sleep(2)
+        if rs:
+            try:
+                ln = rs(p)  # вид товара — по категории на сайте
+            except Exception as e:
+                log(f"⚠️ Вид товара не определился ({e}) — кладу в «{ln['name']}»")
+        base = Path(cfg["queue_root"]) / ln["folder"]
+        base.mkdir(parents=True, exist_ok=True)
+        if _pull_one(p, w, base, log):
+            with _lock:
+                STATE.setdefault("done_ids", {})[str(pid)] = ln["name"]
+            log(f"📥 С сайта → «{ln['name']}»: {p.get('name')}")
+        else:
+            with _lock:
+                STATE.setdefault("failed_ids", []).append(str(pid))
+
+    def worker():
         while True:
             with _lock:
                 if not _PENDING or STATE["stop"]:
-                    _PENDING.clear()
-                    break
+                    return
                 ln, pid, rs = _PENDING.pop(0)
             try:
-                p = woo.wc(f"products/{int(pid)}")
+                one(ln, pid, rs)
             except Exception as e:
-                STATE["errors"] += 1
-                STATE.setdefault("failed_ids", []).append(str(pid))
-                log(f"⚠️ С сайта: товар {pid} не получен: {e}")
-                continue
-            if rs:
-                try:
-                    ln = rs(p)  # вид товара — по категории на сайте
-                except Exception as e:
-                    log(f"⚠️ Вид товара не определился ({e}) — кладу в «{ln['name']}»")
-            base = Path(cfg["queue_root"]) / ln["folder"]
-            base.mkdir(parents=True, exist_ok=True)
-            if _pull_one(p, w, base, log):
-                STATE.setdefault("done_ids", {})[str(pid)] = ln["name"]
-                log(f"📥 С сайта → «{ln['name']}»: {p.get('name')}")
-            else:
-                STATE.setdefault("failed_ids", []).append(str(pid))
-        STATE["msg"] = f"Готово: в очередь {STATE['done']}" + (f", ошибок {STATE['errors']}" if STATE["errors"] else "")
+                log(f"⚠️ С сайта: товар {pid}: {e}")
+
+    try:
+        while True:
+            # 3 товара качаются одновременно — в 2–3 раза быстрее, чем по одному
+            ts = [threading.Thread(target=worker, daemon=True) for _ in range(WORKERS)]
+            for t in ts:
+                t.start()
+            for t in ts:
+                t.join()
+            with _lock:
+                if STATE["stop"] or not _PENDING:
+                    _PENDING.clear()
+                    STATE["msg"] = f"Готово: в очередь {STATE['done']}" + (f", ошибок {STATE['errors']}" if STATE["errors"] else "")
+                    STATE["running"] = False
+                    return
     finally:
         STATE["running"] = False
+
+
+WORKERS = 3
 
 
 def pulled_ids():
