@@ -78,6 +78,10 @@
   .chip{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--surface-2);color:var(--muted);text-decoration:none;cursor:default;white-space:nowrap;border:1px solid transparent}
   .chip.done{background:var(--ok-soft);color:var(--ok);cursor:pointer}
   .brandtg{padding:1px 7px;font-size:11px;margin-left:4px;border-radius:10px}
+  .brandstrip{margin-top:6px;align-items:center}
+  .chip.brandsite{cursor:pointer;border:1px solid transparent;font:inherit;font-size:12px}
+  .chip.brandsite.on{background:var(--ok-soft);color:var(--ok);border-color:var(--ok)}
+  .chip.brandsite.off{background:var(--err-soft);color:var(--err);border-color:var(--err)}
   .tplsel{font-size:11px;padding:1px 4px;max-width:260px;height:auto}
   .tplsel.own{color:var(--accent);border-color:var(--accent)}
   .tplbar{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin:0 0 10px}
@@ -306,6 +310,7 @@
         <button class="sm danger" data-clear="boards">🗑 Очистить</button>
       </span></h3>
     <div id="siteStrip" class="chips"></div>
+    <div id="brandStrip" class="chips brandstrip"></div>
     <div id="bulkBoards"></div>
     <div id="qBoards"></div>
   </div>
@@ -806,6 +811,10 @@ function renderQueue(siteMode){
   if(editing(siteMode ? "qSite" : "qBoards")) return;
   if(!siteMode){
     setHTML($("#siteStrip"), siteChips(S.sites.filter(s => s.enabled && s.id !== "doninisklep")));
+    // бренд в объявлении — отдельно для каждого сайта (нажать — переключить)
+    const bs = S.sites.filter(s => s.enabled && s.id !== "doninisklep");
+    setHTML($("#brandStrip"), bs.length ? `<span class="small muted">Бренд в объявлении:</span>` + bs.map(s => `<button class="chip brandsite ${s.title_brand ? "on" : "off"}" data-brandsite="${esc(s.id)}"
+        title="${s.title_brand ? "На этом сайте бренд пишется в название (и в описание, если он есть в шаблоне). Нажмите — выставлять сюда БЕЗ бренда" : "На этом сайте бренд НЕ пишется. Нажмите — выставлять сюда С брендом"}">${esc(s.name.replace(/\s*\(.*\)/, ""))}: ${s.title_brand ? "🏷 с брендом" : "🚫 без бренда"}</button>`).join("") : "");
     const lf = $("#qLineFilter"), cur = lf.value;
     lf.innerHTML = `<option value="">все виды товара</option>` + S.lines.filter(l => l.id !== "site").map(l => `<option value="${esc(l.id)}">${esc(l.name)}</option>`).join("");
     lf.value = cur;
@@ -832,7 +841,8 @@ function renderQueue(siteMode){
       const chips = Object.entries(p.sites).map(([sid, st]) => {
         const name = sites[sid] ? sites[sid].name.replace(/\s*\(.*\)/, "") : sid;
         const tip = st.error ? esc(st.error) : (st.url ? esc(st.url) : STATUS_RU[st.status]);
-        const label = `${esc(name.split(".")[0])} ${st.status === "done" ? "✓" : st.status === "error" ? "!" : ""}`;
+        const withBrand = sites[sid] && sites[sid].title_brand && !p.no_brand && sid !== "doninisklep";
+        const label = `${esc(name.split(".")[0])}${withBrand ? " 🏷" : ""} ${st.status === "done" ? "✓" : st.status === "error" ? "!" : ""}`;
         return `<span class="chip ${st.status}" title="${tip}" data-act="chip" data-pid="${p.id}" data-site="${sid}">${label}</span>`;
       }).join("");
       const archived = p.status === "archived";
@@ -845,7 +855,7 @@ function renderQueue(siteMode){
           <div class="small muted">${esc(lines[p.line]?.name || p.line)} · ${archived ? `🧾 ${esc(tplLabel(effTpl(p)))}` : `<select class="tplsel${p.template ? " own" : ""}" data-tpl="${p.id}" title="Шаблон текста объявления для этого товара">
               <option value="">🧾 ${esc(tplLabel(lines[p.line]?.template))} — как у «${esc(lines[p.line]?.name || "")}»</option>
               ${(META.types || []).filter(t => t.id !== lines[p.line]?.template).map(t => `<option value="${esc(t.id)}" ${t.id === p.template ? "selected" : ""}>🧾 ${esc(t.label)}${t.custom ? " (свой)" : ""}</option>`).join("")}</select>`} · ${p.photos.length} фото${p.photos_locked ? " · фото выбраны" : ""}${p.texts && Object.keys(p.texts).length ? ` · <span class="warn" title="Текст поправлен вручную — шаблон к нему не применяется. «↺ Тексты по шаблону» — вернуть шаблон">✏️ свой текст</span>` : ""}
-            ${archived ? (p.no_brand ? " · без бренда" : "") : `<button class="sm brandtg ${p.no_brand ? "off" : "on"}" data-act="brand" data-pid="${p.id}" title="${p.no_brand ? "Сейчас: БЕЗ бренда — бренд не пишется ни в названии, ни в описании. Нажмите — включить" : "Сейчас: С брендом (на сайтах, где включено «бренд в название»). Нажмите — выгружать без бренда"}">${p.no_brand ? "🚫 без бренда" : "🏷 с брендом" + (p.brand ? ": " + esc(p.brand) : "")}</button>`}</div></td>
+            ${archived ? (p.no_brand ? " · без бренда" : "") : `<button class="sm brandtg ${p.no_brand ? "off" : "on"}" data-act="brand" data-pid="${p.id}" title="${p.no_brand ? "Этот товар — БЕЗ бренда на всех сайтах. Нажмите — включить бренд (на сайтах с 🏷)" : "С брендом на: " + (Object.keys(p.sites).filter(k => sites[k] && sites[k].title_brand && k !== "doninisklep").map(k => sites[k].name).join(", ") || "— ни на одном (включите 🏷 у сайта сверху)") + ". Нажмите — этот товар везде без бренда"}">${p.no_brand ? "🚫 без бренда" : "🏷 с брендом" + (p.brand ? ": " + esc(p.brand) : "")}</button>`}</div></td>
         <td>${archived ? esc(p.size) : `<input class="mini" data-edit="size" data-pid="${p.id}" value="${esc(p.size)}">`}</td>
         <td>${archived ? esc(p.price) : `<input class="tiny" data-edit="price" data-pid="${p.id}" value="${esc(p.price || "")}">`}</td>
         <td><div class="chips">${chips}</div></td>
@@ -861,6 +871,13 @@ function renderQueue(siteMode){
 $$(".showHistory").forEach(c => c.onchange = (e) => { showHist = e.target.checked; $$(".showHistory").forEach(x => x.checked = showHist); refresh(); });
 $("#qLineFilter").onchange = () => render(true);
 $("#qStateFilter").onchange = () => render(true);
+$("#brandStrip").addEventListener("click", async e => {
+  const b = e.target.closest("[data-brandsite]"); if(!b) return;
+  const s = S.sites.find(x => x.id === b.dataset.brandsite); if(!s) return;
+  await post(`/api/site/${encodeURIComponent(s.id)}`, {title_brand: !s.title_brand});
+  toast(`${s.name}: ${!s.title_brand ? "🏷 теперь С брендом" : "🚫 теперь БЕЗ бренда"}`);
+  refresh();
+});
 $$("[data-tplreset]").forEach(b => b.onclick = async () => {
   const mode = b.dataset.tplreset, lineF = mode === "boards" ? $("#qLineFilter").value : "";
   const own = S.products.filter(p => p.status !== "archived" && (p.line === "site") === (mode === "site") && (!lineF || p.line === lineF) && p.texts && Object.keys(p.texts).length);
