@@ -41,12 +41,29 @@ def _text(h):
     return html.unescape(re.sub(r"<[^>]+>", " ", h))
 
 
+_DIM = r"\d+(?:[.,]\d+)?\s*(?:cm|см)?\s*[x×хX*/\\]\s*\d+(?:[.,]\d+)?(?:\s*(?:cm|см)?\s*[x×хX*/\\]\s*\d+(?:[.,]\d+)?)*\s*(?:cm|см|mm)?"
+_SIZE_WORDS = r"Rozmiar\w*|Wymiar\w*|Wielko\w*|Size|Dimensions?|Размер\w*|Габарит\w*|Długo\w*|Szeroko\w*"
+
+
 def _size(p, size_attr):
+    """Размер товара с сайта: атрибут «Rozmiar», иначе из описания — «Rozmiar: 30x20x10 cm», «Wymiary 26*16*7»,
+    «Rozmiar - 148 cm», «Długość: 148 cm», или просто «30 x 20 x 10 cm» где-нибудь в тексте."""
     s = _attr(p, size_attr, ("rozmiar", "wymiar", "size", "размер"))
-    if not s:
-        m = re.search(r"(?:Rozmiar|Wymiary|Wymiar|Size)\s*:\s*([^\n]+)", _text(p.get("description")) + "\n" + _text(p.get("short_description")), re.I)
-        s = m.group(1).strip() if m else ""
-    return s
+    if s and re.search(r"\d", s):
+        return s.strip()
+    text = _text(p.get("description")) + "\n" + _text(p.get("short_description"))
+    text = text.replace("\xa0", " ")
+    # 1) строка со словом «Rozmiar/Wymiary/…» — то, что после него (двоеточие, тире или пробел)
+    for m in re.finditer(rf"(?:{_SIZE_WORDS})\s*(?:\([^)]*\))?\s*[:：\-–—]?\s*([^\n]{{1,80}})", text, re.I):
+        v = m.group(1).strip(" .;,")
+        if re.search(r"\d", v) and not re.fullmatch(r"0+", v):
+            return v
+    # 2) размеры вида «30 x 20 x 10 cm» в любом месте описания или в названии
+    for src in (text, p.get("name") or ""):
+        m = re.search(_DIM, src, re.I)
+        if m:
+            return m.group(0).strip()
+    return s or ""
 
 
 def _clean(s):
@@ -124,6 +141,9 @@ def _pull_one(p, w, base, log):
             STATE["skipped"] += 1
             return False
         brand, size = product_info(p, w)
+        if not size:
+            snip = re.sub(r"\s+", " ", _text(p.get("description")))[:160]
+            log(f"⚠️ Размер не найден в описании «{p.get('name')}» — впишите его в очереди. Начало описания: «{snip}»")
         sku = str(p.get("sku") or "").strip()
         name = _clean(f"{brand} {size.replace('*', 'x').replace('cm', '').strip()}")[:90] or f"товар {p.get('id')}"
         tmp = base / f"_загрузка_сайт_{p.get('id')}"
