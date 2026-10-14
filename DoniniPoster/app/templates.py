@@ -186,6 +186,12 @@ SIZE_LINE_RE = __import__("re").compile(
     __import__("re").IGNORECASE | __import__("re").MULTILINE)
 
 
+# вся строка с размером (без захвата следующей строки) — убирается, когда размера у товара нет
+SIZE_LINE_DROP_RE = __import__("re").compile(
+    r"^[ \t]*(?:méretek|méret|Größe|Grösse|Tamanho|Tamaño|Afmetingen|Rozmiar|Wymiary|Dimensiuni|Veličina|Velikost|Rozměry|Μέγεθος|Size|Размер)[ \t]*:[^\n]*(?:\n|$)",
+    __import__("re").IGNORECASE | __import__("re").MULTILINE)
+
+
 def list_types(custom):
     items = [{"id": k, "label": TYPE_LABELS.get(k, k), "custom": False} for k in BUILT_IN]
     items += [{"id": c["id"], "label": c["label"], "custom": True} for c in custom]
@@ -258,6 +264,9 @@ def build_texts(type_id, lang, size, code, brand="", custom=None):
             elif len(old_size) >= 3 and old_size in text:
                 text = text.replace(old_size, size)
         body = text
+    if not (size or "").strip():
+        # размера нет — строку «Rozmiar: …» убираем совсем (иначе в объявлении остался бы размер из шаблона)
+        body = SIZE_LINE_DROP_RE.sub("", body).lstrip("\n")
     return title, body
 
 

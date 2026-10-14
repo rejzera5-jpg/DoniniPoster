@@ -1604,7 +1604,7 @@ def create_app(engine):
         ln = engine.line(d.get("line") or "") or engine.cfg["lines"][0]
         return await asyncio.to_thread(szwego.download_item, engine.cfg, ln, d.get("dest") or "downloads",
                                        d.get("shop") or "", d.get("item") or {}, bool(d.get("only_new", True)),
-                                       bool(d.get("need_size", True)), engine.log)
+                                       bool(d.get("need_size", True)) and bool(engine.cfg.get("szwego_need_size", False)), engine.log)
 
     @app.post("/api/szwego/open")
     async def szwego_open(req: Request):
