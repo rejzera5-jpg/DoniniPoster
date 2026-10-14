@@ -281,7 +281,7 @@ def create_app(engine):
 
         def get():
             params = {"status": "publish", "orderby": "date", "order": "desc", "per_page": 40, "page": max(1, page),
-                      "_fields": "id,name,images,attributes,price,regular_price,sku,permalink"}
+                      "_fields": "id,name,images,attributes,dimensions,price,regular_price,sku,permalink"}
             if category:
                 params["category"] = category
             if search:

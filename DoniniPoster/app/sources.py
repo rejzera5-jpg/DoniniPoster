@@ -51,6 +51,17 @@ def _size(p, size_attr):
     s = _attr(p, size_attr, ("rozmiar", "wymiar", "size", "размер"))
     if s and re.search(r"\d", s):
         return s.strip()
+    # стандартное поле WooCommerce «Wymiary» (длина × ширина × высота, вкладка «Dodatkowe informacje»)
+    d = p.get("dimensions") or {}
+    dims = [str(d.get(k) or "").strip().replace(",", ".") for k in ("length", "width", "height")]
+    dims = [x.rstrip("0").rstrip(".") if "." in x else x for x in dims if x and x not in ("0", "0.0")]
+    if dims:
+        return "x".join(dims) + " cm"
+    # любой атрибут, где записан размер вида «30x20x10»
+    for a in p.get("attributes") or []:
+        for o in a.get("options") or []:
+            if re.search(_DIM, str(o), re.I):
+                return str(o).strip()
     text = _text(p.get("description")) + "\n" + _text(p.get("short_description"))
     text = text.replace("\xa0", " ")
     # 1) строка со словом «Rozmiar/Wymiary/…» — то, что после него (двоеточие, тире или пробел)
@@ -143,7 +154,9 @@ def _pull_one(p, w, base, log):
         brand, size = product_info(p, w)
         if not size:
             snip = re.sub(r"\s+", " ", _text(p.get("description")))[:160]
-            log(f"⚠️ Размер не найден в описании «{p.get('name')}» — впишите его в очереди. Начало описания: «{snip}»")
+            attrs = "; ".join(f"{a.get('name')}: {', '.join(map(str, a.get('options') or []))}" for a in p.get("attributes") or [])[:160]
+            log(f"⚠️ Размер не найден у «{p.get('name')}» (ни в описании, ни в «Wymiary», ни в атрибутах) — впишите его в очереди. "
+                f"Атрибуты: «{attrs or 'нет'}». Начало описания: «{snip}»")
         sku = str(p.get("sku") or "").strip()
         name = _clean(f"{brand} {size.replace('*', 'x').replace('cm', '').strip()}")[:90] or f"товар {p.get('id')}"
         tmp = base / f"_загрузка_сайт_{p.get('id')}"
