@@ -793,6 +793,25 @@ const onMsg = (msg, sender, reply) => {
         return { ok: true, count: r.steps.length, photos: await loadPhotos(msg.multiple ? r.photos : r.photos.slice(0, 1)) };
       }
       case "recUndo": if (recs[tabId] && recs[tabId].steps.length > 1) { recs[tabId].steps.pop(); await saveRecs(recs); } return { count: recs[tabId] ? recs[tabId].steps.length : 0 };
+      case "recToggles": {
+        const r = recs[tabId];
+        if (!r) return { ok: false };
+        const plain = (x) => String(x || "").replace(/\\/g, "");
+        let at = r.steps.findIndex((x) => x.action === "publish");
+        if (at < 0) at = r.steps.length;
+        let added = 0;
+        for (const it of msg.items || []) {
+          const id = String(it.id || "");
+          if (!/^parameters\.[\w.-]+$/.test(id)) continue;
+          if (r.steps.some((x) => (x.selectors || []).some((sel) => plain(sel).includes(id + "_")))) continue;
+          const esc = id.replace(/\./g, "\\.");
+          r.steps.splice(at++, 0, { action: "click", label: it.label || id, auto_param: true,
+            selectors: [`[data-testid="${esc}_unactive"]`, `[data-cy="${esc}"]`] });
+          added++;
+        }
+        if (added) { await saveRecs(recs); log(`🎥 ${r.siteName}: дописал в запись параметры, выбранные на странице: ${added}`); }
+        return { ok: true, added };
+      }
       case "recDone": {
         const res = await finishRecording(tabId);
         setTimeout(() => chrome.tabs.remove(tabId).catch(() => {}), 1500);

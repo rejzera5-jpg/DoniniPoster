@@ -935,7 +935,7 @@
     status(`Шаг ${i + 1}: жду, пока OLX сам заполнит поля по фото…`);
     const t2 = Date.now();
     while (Date.now() - t2 < 15000 && !unloading) {
-      if (AI_RE.test(document.body.innerText || "")) { await sleep(1500); return; }
+      if (AI_RE.test(document.body.innerText || "")) { await sleep(3500); return; }
       await sleep(400);
     }
   }
@@ -1238,6 +1238,8 @@
         }
         if (st.action === "publish") {
           await recheckBoxes(steps, i);
+          await sleep(1500);
+          await recheckBoxes(steps, i);
           waitPublish(el, i);
           return;
         }
@@ -1279,6 +1281,16 @@
             (() => { try { const u = new URL(link.href, location.href); return u.origin === location.origin ? u.pathname + u.search !== location.pathname + location.search : true; } catch (e) { return false; } })();
           clickEl(el);
           lastCheck = { input: ci, idx: i };
+          if (tg) {
+            for (let k = 0; k < 3 && !unloading; k++) {
+              await sleep(900);
+              if (toggleIsOn(tg)) break;
+              const off = qsaDeep(tg.off).find((e) => !isPanel(e) && visible(e));
+              if (!off) break;
+              status(`Шаг ${i + 1}: «${st.label || ""}» не выбралось — нажимаю ещё раз…`);
+              clickEl(off);
+            }
+          }
           if (leaves) {
             // ссылка на другую страницу: ждём, пока сайт перейдёт, и НЕ делаем следующие шаги на старой странице
             // (иначе следующий шаг находит похожий текст в меню старой страницы и кликает не туда)
@@ -1500,6 +1512,13 @@
     $p("done").onclick = async () => {
       await flushPending();
       status("Сохраняю…");
+      // OLX: кнопки-параметры (Męskie, Nowe…), которые выбраны на странице, но клика по ним в записи нет
+      // (их выбрал сам OLX по фото) — дописываем в сценарий, иначе в следующий раз OLX может выбрать другое
+      try {
+        const items = qsaDeep('[data-testid^="parameters."][data-testid$="_active"]').filter((e) => !isPanel(e) && visible(e))
+          .map((e) => ({ id: e.getAttribute("data-testid").replace(/_active$/, ""), label: cleanText(e.innerText || e.textContent).split(" ").slice(0, 6).join(" ") }));
+        if (items.length) await bg({ type: "recToggles", items });
+      } catch (e) {}
       const r = await bg({ type: "recDone" });
       status(r && r.ok !== false ? `💾 Сценарий сохранён (${r.steps || ""} шагов). Вкладка закроется.` : `Ошибка: ${(r && (r.error || r.detail)) || "нет связи с программой"}`, !(r && r.ok !== false));
     };
