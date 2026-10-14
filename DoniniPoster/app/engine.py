@@ -124,7 +124,7 @@ class Engine:
         use_brand = site.get("title_brand", site.get("id") in BRAND_SITES)
         if product.get("no_brand"):  # в очереди выключено «с брендом» — бренд не ставится нигде
             use_brand, brand = False, ""
-        title, body = build_texts(line.get("template", "bags"), lang, product.get("size", ""),
+        title, body = build_texts(product.get("template") or line.get("template", "bags"), lang, product.get("size", ""),
                                   product["code"], brand=brand if use_brand else "",
                                   custom=self.cfg.get("custom_templates"))
         if use_brand and brand and brand.lower() not in title.lower():

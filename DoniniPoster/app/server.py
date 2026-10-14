@@ -892,6 +892,8 @@ def create_app(engine):
         for k in ("size", "code", "brand"):
             if k in data and data[k] is not None:
                 p[k] = str(data[k]).strip()
+        if "template" in data:  # свой шаблон текста для товара; пусто — как у вида товара
+            _set_tpl(p, data.get("template"))
         if "no_brand" in data:
             if data["no_brand"]:
                 p["no_brand"] = True
@@ -932,6 +934,17 @@ def create_app(engine):
         engine.save()
         return {"ok": True}
 
+    def _set_tpl(p, tpl):
+        from .templates import list_types
+        tpl = (tpl or "").strip()
+        line = next((l for l in engine.cfg["lines"] if l["id"] == p.get("line")), {})
+        if not tpl or tpl == line.get("template"):
+            p.pop("template", None)
+            return
+        if tpl not in {t["id"] for t in list_types(engine.cfg.get("custom_templates", []))}:
+            raise HTTPException(400, "Нет такого шаблона — откройте Donini Manager, он сохранит шаблоны в программу")
+        p["template"] = tpl
+
     def _card_photos(p):
         from .queue_store import list_photos
         f = Path(p.get("folder") or "")
@@ -962,9 +975,11 @@ def create_app(engine):
         names = {s["id"]: s["name"] for s in C.load_sites()}
         return {"id": p["id"], "code": p.get("code"), "name": p.get("name"), "size": p.get("size", ""), "price": p.get("price"),
                 "brand": brand_of_product(p), "brand_manual": bool((p.get("brand") or "").strip()), "no_brand": bool(p.get("no_brand")),
-                "line": p.get("line"), "line_name": line.get("name", ""), "template": line.get("template", ""),
-                "template_label": types.get(line.get("template", ""), line.get("template", "")),
-                "lines": [{"id": l["id"], "name": l["name"], "template_label": types.get(l.get("template", ""), "")}
+                "line": p.get("line"), "line_name": line.get("name", ""), "template": p.get("template") or line.get("template", ""),
+                "template_own": p.get("template") or "", "line_template": line.get("template", ""),
+                "template_label": types.get(p.get("template") or line.get("template", ""), line.get("template", "")),
+                "types": [{"id": k, "label": v} for k, v in types.items()],
+                "lines": [{"id": l["id"], "name": l["name"], "template": l.get("template", ""), "template_label": types.get(l.get("template", ""), "")}
                           for l in engine.cfg["lines"] if (l["id"] == "site") == (p.get("line") == "site")],
                 "photos": sel, "others": rest, "locked": bool(p.get("photos_locked")),
                 "folder": p.get("folder"), "folder_exists": Path(p.get("folder") or "").is_dir(), "status": p.get("status"),
@@ -1003,6 +1018,8 @@ def create_app(engine):
                     raise HTTPException(400, "Цена — число")
             elif act == "size":
                 p["size"] = str(val or "").strip()
+            elif act == "template":
+                _set_tpl(p, val)
             elif act == "texts_reset":  # свой текст убрать — снова по шаблону (Donini Manager)
                 p.pop("texts", None)
             elif act == "brand_on":
@@ -1015,7 +1032,7 @@ def create_app(engine):
                 raise HTTPException(400, "Неизвестное действие")
             n += 1
         engine.save()
-        engine.log(f"✔ Выбранные товары ({n}): {({'retry': 'повтор ошибок', 'line': 'перенесены в другой вид', 'price': 'новая цена', 'size': 'новый размер', 'top': 'выставляются первыми', 'texts_reset': 'тексты снова по шаблону', 'brand_on': 'с брендом', 'brand_off': 'без бренда'}).get(act, act)}")
+        engine.log(f"✔ Выбранные товары ({n}): {({'retry': 'повтор ошибок', 'line': 'перенесены в другой вид', 'price': 'новая цена', 'size': 'новый размер', 'top': 'выставляются первыми', 'template': 'новый шаблон текста', 'texts_reset': 'тексты снова по шаблону', 'brand_on': 'с брендом', 'brand_off': 'без бренда'}).get(act, act)}")
         return {"ok": True, "done": n}
 
     # ---------- свой текст товара (перед выгрузкой) ----------
@@ -1046,6 +1063,22 @@ def create_app(engine):
         hits.sort(key=lambda h: (not h["_exact"], h["added"] or ""), reverse=False)
         exact_first = [h for h in hits if h["_exact"]] + sorted([h for h in hits if not h["_exact"]], key=lambda h: h["added"] or "", reverse=True)
         return {"items": exact_first[:30], "total": len(hits)}
+
+    @app.post("/api/line/{lid}/template")
+    async def line_template(lid: str, req: Request):
+        from .templates import list_types
+        tpl = ((await req.json()).get("template") or "").strip()
+        if tpl not in {t["id"] for t in list_types(engine.cfg.get("custom_templates", []))}:
+            raise HTTPException(400, "Нет такого шаблона")
+        cfg = C.load_config()
+        ln = next((l for l in cfg["lines"] if l["id"] == lid), None)
+        if not ln:
+            raise HTTPException(404, "Нет такого вида товара")
+        ln["template"] = tpl
+        C.save_config(cfg)
+        engine.cfg = C.load_config()
+        engine.log(f"🧾 «{ln['name']}»: шаблон текста — {tpl}")
+        return {"ok": True}
 
     @app.post("/api/queue/texts_reset")
     async def queue_texts_reset(req: Request):
@@ -1078,7 +1111,7 @@ def create_app(engine):
         out = []
         for x in langs:
             try:
-                t, b = build_texts(line.get("template", "bags"), x["lang"], p.get("size", ""), p["code"],
+                t, b = build_texts(p.get("template") or line.get("template", "bags"), x["lang"], p.get("size", ""), p["code"],
                                    custom=engine.cfg.get("custom_templates"))
             except Exception as e:
                 t, b = "", f"(шаблон не найден: {e})"
@@ -1096,7 +1129,7 @@ def create_app(engine):
         texts = dict(p.get("texts") or {})
         for lang, v in (data or {}).items():
             try:
-                t, b = build_texts(line.get("template", "bags"), lang, p.get("size", ""), p["code"],
+                t, b = build_texts(p.get("template") or line.get("template", "bags"), lang, p.get("size", ""), p["code"],
                                    custom=engine.cfg.get("custom_templates"))
             except Exception:
                 t, b = "", ""

@@ -78,6 +78,11 @@
   .chip{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--surface-2);color:var(--muted);text-decoration:none;cursor:default;white-space:nowrap;border:1px solid transparent}
   .chip.done{background:var(--ok-soft);color:var(--ok);cursor:pointer}
   .brandtg{padding:1px 7px;font-size:11px;margin-left:4px;border-radius:10px}
+  .tplsel{font-size:11px;padding:1px 4px;max-width:260px;height:auto}
+  .tplsel.own{color:var(--accent);border-color:var(--accent)}
+  .tplbar{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin:0 0 10px}
+  .tplitem{display:inline-flex;gap:6px;align-items:center}
+  .tplitem select{font-size:12px;padding:2px 6px}
   .brandtg.on{color:var(--ok);border-color:var(--ok)}
   .brandtg.off{color:var(--err, #e5534b);border-color:var(--err, #e5534b)}
   .chip.error{background:var(--err-soft);color:var(--err);cursor:pointer}
@@ -336,8 +341,8 @@
 
 <!-- ============ DONINI MANAGER ============ -->
 <section class="page hidden" id="page-manager">
-  <div class="row"><label class="field">Вид товара<select id="mgrLine"></select></label>
-    <div class="small muted" style="flex:1">Выберите вид товара — Manager сразу откроет его шаблон. Шаблоны и правки текстов отсюда сразу сохраняются в программу — по ним идут все объявления.</div></div>
+  <div class="row"><label class="field">Шаблон<select id="mgrLine"></select></label>
+    <div class="small muted" style="flex:1">Выберите шаблон — Manager откроет его. В скобках — какие виды товара по нему выставляются. Правки сразу сохраняются в программу и применяются ко всем товарам с этим шаблоном (кроме товаров со своим текстом ✏️).</div></div>
   <iframe id="mgrFrame" style="width:100%;height:calc(100vh - 150px);border:1px solid var(--border);border-radius:14px;background:#17130f"></iframe>
 </section>
 
@@ -597,7 +602,8 @@ function go(p){
   if(p === "lines"){ linesDraft = null; renderLines(); }
   if(p === "site") wooLoad();
   if(p === "photos") loadPhotosPage();
-  if(p === "manager") openManager();
+  if(p === "manager") openManagerTpl(null, true);
+  if(p === "manager" || p === "boards" || p === "site") api("/api/meta").then(m => { META = m; }).catch(() => {});
   render(true);
 }
 $$(".nav").forEach(b => b.onclick = () => go(b.dataset.page));
@@ -790,6 +796,10 @@ function renderPub(){
 
 // ---------- очереди (сайт и доски) ----------
 const STATUS_RU = {pending:"ждёт", running:"выставляет", done:"✓", error:"ошибка", skipped:"пропуск"};
+// шаблоны текста: список для выбора (свои шаблоны из Donini Manager — тоже здесь)
+const tplLabel = (id) => { const t = (META.types || []).find(x => x.id === id); return t ? t.label : (id || "—"); };
+const tplOpts = (cur) => (META.types || []).map(t => `<option value="${esc(t.id)}" ${t.id === cur ? "selected" : ""}>${esc(t.label)}${t.custom ? " (свой)" : ""}</option>`).join("");
+const effTpl = (p) => p.template || ((S.lines.find(l => l.id === p.line) || {}).template) || "";
 function renderQueue(siteMode){
   const box = siteMode ? $("#qSite") : $("#qBoards");
   if(editing(siteMode ? "qSite" : "qBoards")) return;
@@ -812,7 +822,11 @@ function renderQueue(siteMode){
   const tpl = (l) => { const t = META.types.find(x => x.id === (l || {}).template); return t ? t.label : ((l || {}).template || "—"); };
   const allSel = shown.length && shown.every(p => SEL.has(p.id));
   renderBulk(siteMode, rows);
-  setHTML(box, `${rows.length > 300 ? `<div class="small muted" style="margin-bottom:6px">Показаны первые 300 из ${rows.length}</div>` : ""}<table><thead><tr><th style="width:26px"><input type="checkbox" data-selall="${siteMode ? 1 : 0}" ${allSel ? "checked" : ""} title="Выбрать все"></th><th></th><th>Код</th><th>Товар</th><th>Размер</th><th>Цена, зл</th><th>Сайты</th><th></th></tr></thead><tbody>${
+  const usedLines = [...new Set(rows.filter(p => p.status !== "archived").map(p => p.line))].map(id => lines[id]).filter(Boolean);
+  const tplBar = usedLines.length ? `<div class="tplbar"><span class="small muted">Шаблон текста:</span>${usedLines.map(l => `<span class="tplitem"><b>${esc(l.name)}</b>
+      <select data-linetpl="${esc(l.id)}" title="Шаблон текста для всех товаров «${esc(l.name)}»">${tplOpts(l.template)}</select>
+      <button class="sm" data-mgrtpl="${esc(l.template)}" title="Открыть этот шаблон в Donini Manager и поправить текст">✏️</button></span>`).join("")}</div>` : "";
+  setHTML(box, `${tplBar}${rows.length > 300 ? `<div class="small muted" style="margin-bottom:6px">Показаны первые 300 из ${rows.length}</div>` : ""}<table><thead><tr><th style="width:26px"><input type="checkbox" data-selall="${siteMode ? 1 : 0}" ${allSel ? "checked" : ""} title="Выбрать все"></th><th></th><th>Код</th><th>Товар</th><th>Размер</th><th>Цена, зл</th><th>Сайты</th><th></th></tr></thead><tbody>${
     shown.map(p => {
       const chips = Object.entries(p.sites).map(([sid, st]) => {
         const name = sites[sid] ? sites[sid].name.replace(/\s*\(.*\)/, "") : sid;
@@ -827,7 +841,9 @@ function renderQueue(siteMode){
         <td><img class="thumb" loading="lazy" src="/api/thumb?path=${encodeURIComponent(p.photos[0]||"")}" data-act="photos" data-pid="${p.id}" style="cursor:zoom-in" title="Посмотреть фото (можно убрать лишние)"></td>
         <td><span class="code">${esc(p.code)}</span></td>
         <td style="max-width:340px"><a data-act="card" data-pid="${p.id}" style="cursor:pointer">${esc(p.name)}</a>
-          <div class="small muted">${esc(lines[p.line]?.name || p.line)} · <span title="Шаблон текста объявления">🧾 ${esc(tpl(lines[p.line]))}</span> · ${p.photos.length} фото${p.photos_locked ? " · фото выбраны" : ""}${p.texts && Object.keys(p.texts).length ? ` · <span class="warn" title="Текст поправлен вручную — шаблон к нему не применяется. «↺ Тексты по шаблону» — вернуть шаблон">✏️ свой текст</span>` : ""}
+          <div class="small muted">${esc(lines[p.line]?.name || p.line)} · ${archived ? `🧾 ${esc(tplLabel(effTpl(p)))}` : `<select class="tplsel${p.template ? " own" : ""}" data-tpl="${p.id}" title="Шаблон текста объявления для этого товара">
+              <option value="">🧾 ${esc(tplLabel(lines[p.line]?.template))} — как у «${esc(lines[p.line]?.name || "")}»</option>
+              ${(META.types || []).filter(t => t.id !== lines[p.line]?.template).map(t => `<option value="${esc(t.id)}" ${t.id === p.template ? "selected" : ""}>🧾 ${esc(t.label)}${t.custom ? " (свой)" : ""}</option>`).join("")}</select>`} · ${p.photos.length} фото${p.photos_locked ? " · фото выбраны" : ""}${p.texts && Object.keys(p.texts).length ? ` · <span class="warn" title="Текст поправлен вручную — шаблон к нему не применяется. «↺ Тексты по шаблону» — вернуть шаблон">✏️ свой текст</span>` : ""}
             ${archived ? (p.no_brand ? " · без бренда" : "") : `<button class="sm brandtg ${p.no_brand ? "off" : "on"}" data-act="brand" data-pid="${p.id}" title="${p.no_brand ? "Сейчас: БЕЗ бренда — бренд не пишется ни в названии, ни в описании. Нажмите — включить" : "Сейчас: С брендом (на сайтах, где включено «бренд в название»). Нажмите — выгружать без бренда"}">${p.no_brand ? "🚫 без бренда" : "🏷 с брендом" + (p.brand ? ": " + esc(p.brand) : "")}</button>`}</div></td>
         <td>${archived ? esc(p.size) : `<input class="mini" data-edit="size" data-pid="${p.id}" value="${esc(p.size)}">`}</td>
         <td>${archived ? esc(p.price) : `<input class="tiny" data-edit="price" data-pid="${p.id}" value="${esc(p.price || "")}">`}</td>
@@ -863,10 +879,23 @@ $$("[data-clear]").forEach(b => b.onclick = async () => {
 });
 for(const id of ["#qSite", "#qBoards"]){
   $(id).addEventListener("change", async e => {
+    const t = e.target;
+    if(t.dataset.tpl !== undefined){
+      t.blur();
+      try{ await post(`/api/product/${t.dataset.tpl}`, {template: t.value}); toast(`🧾 Шаблон товара: ${tplLabel(t.value || effTpl({line: S.products.find(x => x.id === t.dataset.tpl).line}))}`); }catch(er){ alert(er.message || er); }
+      return refresh();
+    }
+    if(t.dataset.linetpl){
+      t.blur();
+      const l = S.lines.find(x => x.id === t.dataset.linetpl);
+      try{ await post(`/api/line/${t.dataset.linetpl}/template`, {template: t.value}); toast(`🧾 «${l ? l.name : ""}» — шаблон «${tplLabel(t.value)}»`); }catch(er){ alert(er.message || er); }
+      return refresh();
+    }
     const i = e.target.closest("[data-edit]"); if(!i) return;
     await post(`/api/product/${i.dataset.pid}`, {[i.dataset.edit]: i.value});
   });
   $(id).addEventListener("click", async e => {
+    const mt = e.target.closest("[data-mgrtpl]"); if(mt){ openManagerTpl(mt.dataset.mgrtpl); return; }
     const b = e.target.closest("[data-act]"); if(!b) return;
     const {act, pid, site, path} = b.dataset;
     if(act === "texts") { textsModal(pid); return; }
@@ -886,22 +915,36 @@ for(const id of ["#qSite", "#qBoards"]){
   });
 }
 // Donini Manager: открываем сразу с шаблоном нужного вида товара (например «Галстуки» → шаблон галстуков)
-let mgrWantLine = null;
-function openManager(lineId){
-  const lines = S ? S.lines.filter(l => l.id !== "site") : [];
+let mgrWantTpl = null;
+function openManager(lineId){  // по виду товара — его шаблон
+  const l = lineId && S ? S.lines.find(x => x.id === lineId) : null;
+  openManagerTpl(l ? l.template : null, true);
+}
+function openManagerTpl(tpl, noGo){
+  if(tpl) mgrWantTpl = tpl;
+  if(!noGo && page !== "manager"){ go("manager"); return; }
   const sel = $("#mgrLine");
-  if(lineId) mgrWantLine = lineId;
-  const cur = mgrWantLine || sel.value || (lines[0] || {}).id;
-  sel.innerHTML = lines.map(l => `<option value="${esc(l.id)}" ${l.id === cur ? "selected" : ""}>${esc(l.name)}</option>`).join("");
-  const line = lines.find(l => l.id === cur);
+  let cur = mgrWantTpl || sel.value;
+  if(!cur){ try{ cur = localStorage.getItem("plt_productType"); }catch(e){} }
+  const used = (id) => (S ? S.lines.filter(l => l.id !== "site" && l.template === id).map(l => l.name) : []);
+  const types = (META.types || []).slice().sort((a, b) => used(b.id).length - used(a.id).length);
+  if(!types.some(t => t.id === cur)) cur = (types[0] || {}).id;
+  sel.innerHTML = types.map(t => `<option value="${esc(t.id)}" ${t.id === cur ? "selected" : ""}>${esc(t.label)}${used(t.id).length ? " (" + esc(used(t.id).join(", ")) + ")" : ""}</option>`).join("");
   let changed = false;
-  try{ if(line && line.template && localStorage.getItem("plt_productType") !== line.template){ localStorage.setItem("plt_productType", line.template); changed = true; } }catch(e){}
+  try{ if(cur && localStorage.getItem("plt_productType") !== cur){ localStorage.setItem("plt_productType", cur); changed = true; } }catch(e){}
   const f = $("#mgrFrame");
   if(!f.src) f.src = "/manager"; else if(changed) f.contentWindow.location.reload();
-  mgrWantLine = null;
+  mgrWantTpl = null;
 }
-$("#mgrLine").onchange = (e) => { mgrWantLine = e.target.value; openManager(); };
-$("#syncManager").onclick = () => { mgrWantLine = $("#qLineFilter").value || null; go("manager"); }; // Donini Manager встроен в программу: правки применяются сразу
+$("#mgrLine").onchange = (e) => openManagerTpl(e.target.value, true);
+// «🧾 Шаблоны»: шаблон выбранного вида товара, иначе — тот, по которому больше всего товаров в очереди
+$("#syncManager").onclick = () => {
+  const lf = $("#qLineFilter").value;
+  let tpl = lf ? (S.lines.find(l => l.id === lf) || {}).template : null;
+  if(!tpl){ const cnt = {}; S.products.filter(p => p.status !== "archived" && p.line !== "site").forEach(p => { const t = effTpl(p); cnt[t] = (cnt[t] || 0) + 1; });
+    tpl = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0] || null; }
+  openManagerTpl(tpl);
+};
 function chipErrorModal(p, site, st){
   const s = S.sites.find(x => x.id === site);
   modal(`<h3>Ошибка: ${esc(s?.name || site)}, товар ${esc(p.code)}</h3>
@@ -1739,6 +1782,7 @@ function renderBulk(siteMode, rows){
     <select data-bulksel="line"><option value="">➡ Перенести в вид товара…</option>${lineOpts}</select>
     <button class="sm" data-bulk="price">💰 Цена…</button>
     <button class="sm" data-bulk="size">📏 Размер…</button>
+    <select data-bulksel="template"><option value="">🧾 Шаблон текста…</option><option value="__line">как у вида товара</option>${tplOpts("")}</select>
     <button class="sm" data-bulk="texts_reset" title="Убрать свои тексты (✏️) — снова текст из шаблона">↺ Текст по шаблону</button>
     <button class="sm" data-bulk="brand_on" title="Выбранные товары — с брендом">🏷 С брендом</button>
     <button class="sm" data-bulk="brand_off" title="Выбранные товары — без бренда (бренд не пишется нигде)">🚫 Без бренда</button>
@@ -1769,6 +1813,7 @@ for(const id of ["#qSite", "#qBoards", "#bulkSite", "#bulkBoards"]){
       render(true);
     }
     if(c.dataset.bulksel === "line" && c.value){ const v = c.value; c.value = ""; doBulk("line", v); }
+    if(c.dataset.bulksel === "template" && c.value){ const v = c.value === "__line" ? "" : c.value; c.value = ""; doBulk("template", v); }
   });
   $(id).addEventListener("click", e => { const b = e.target.closest("[data-bulk]"); if(b) doBulk(b.dataset.bulk); });
 }
@@ -1792,8 +1837,8 @@ async function cardModal(pid){
       </div>
       <div style="display:flex;flex-direction:column;gap:10px">
         <label class="field">Вид товара<select id="cdLine">${d.lines.map(l => `<option value="${esc(l.id)}" ${l.id === d.line ? "selected" : ""}>${esc(l.name)}</option>`).join("")}</select></label>
-        <div class="sc" style="display:block">🧾 Шаблон текста: <b id="cdTpl">${esc(d.template_label)}</b>
-          <div class="small muted">Шаблон берётся из вида товара. Сменить вид — сменится шаблон. Поправить сам текст — «✏️ Тексты».</div></div>
+        <label class="field">🧾 Шаблон текста<select id="cdTplSel"><option value="">как у вида товара: ${esc((d.lines.find(l => l.id === d.line) || {}).template_label || "—")}</option>${d.types.map(t => `<option value="${esc(t.id)}" ${t.id === d.template_own ? "selected" : ""}>${esc(t.label)}</option>`).join("")}</select></label>
+        <div class="small muted" style="margin-top:-6px">Поправить сам текст шаблона — <a data-m="mgr" style="cursor:pointer">✏️ открыть в Donini Manager</a>, текст только этого товара — «✏️ Тексты».</div>
         <label class="field">Бренд ${d.brand_manual ? "" : `<span class="muted">(найден автоматически)</span>`}<input id="cdBrand" value="${esc(d.brand)}"></label>
         <label class="switch small"><input type="checkbox" id="cdWithBrand" ${d.no_brand ? "" : "checked"}> выгружать с брендом <span class="muted">(снять — бренд не пишется нигде)</span></label>
         <div class="row">
@@ -1816,20 +1861,21 @@ async function cardModal(pid){
     if(act === "close") return close();
     if(act === "folder") return post("/api/open_folder", {path: d.folder});
     if(act === "texts"){ close(); return textsModal(pid); }
+    if(act === "mgr"){ close(); const l = d.lines.find(x => x.id === $("#cdLine", m).value); return openManagerTpl($("#cdTplSel", m).value || (l && l.template) || d.template); }
     if(act === "reset"){ await post(`/api/product/${pid}`, {photos_reset: true}); close(); toast("Фото — как в папке"); return refresh(); }
     if(act === "save"){
       if(!sel.length) return alert("Оставьте хотя бы одно фото");
       const skip = {}; m.querySelectorAll("[data-site]").forEach(c => skip[c.dataset.site] = c.checked);
-      const body = {no_brand: !$("#cdWithBrand", m).checked, brand: $("#cdBrand", m).value, size: $("#cdSize", m).value, price: $("#cdPrice", m).value, line: $("#cdLine", m).value, skip_sites: skip};
+      const body = {template: $("#cdTplSel", m).value, no_brand: !$("#cdWithBrand", m).checked, brand: $("#cdBrand", m).value, size: $("#cdSize", m).value, price: $("#cdPrice", m).value, line: $("#cdLine", m).value, skip_sites: skip};
       if(sel.join("|") !== d.photos.join("|") || off.length !== d.others.length) body.photos = sel;
       await post(`/api/product/${pid}`, body);
       close(); toast("✓ Карточка сохранена"); refresh();
     }
   });
   const box = m.querySelector(".modal"); box.style.width = "min(1080px,100%)";
-  const redraw = () => { const wb = $("#cdWithBrand", m).checked; d.no_brand = !wb; const keep = {b: $("#cdBrand", m).value, s: $("#cdSize", m).value, p: $("#cdPrice", m).value, l: $("#cdLine", m).value};
+  const redraw = () => { const wb = $("#cdWithBrand", m).checked; d.no_brand = !wb; d.template_own = $("#cdTplSel", m).value; const keep = {b: $("#cdBrand", m).value, s: $("#cdSize", m).value, p: $("#cdPrice", m).value, l: $("#cdLine", m).value};
     box.innerHTML = draw(); $("#cdBrand", m).value = keep.b; $("#cdSize", m).value = keep.s; $("#cdPrice", m).value = keep.p; $("#cdLine", m).value = keep.l; showTpl(); };
-  const showTpl = () => { const l = d.lines.find(x => x.id === $("#cdLine", m).value); $("#cdTpl", m).textContent = l ? (l.template_label || "—") : "—"; };
+  const showTpl = () => { const l = d.lines.find(x => x.id === $("#cdLine", m).value); const o = $("#cdTplSel", m).options[0]; o.textContent = "как у вида товара: " + (l ? (l.template_label || "—") : "—"); };
   m.addEventListener("change", e => { if(e.target.id === "cdLine") showTpl(); });
   m.addEventListener("click", e => {
     const o = e.target.closest("[data-open]"); if(o){ openExt(o.dataset.open); return; }
