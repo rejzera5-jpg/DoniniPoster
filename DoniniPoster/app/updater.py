@@ -6,6 +6,7 @@
 сценарии, очередь) и папки очереди не трогаются."""
 import json
 import shutil
+import time
 import urllib.parse
 import urllib.request
 import zipfile
@@ -55,9 +56,9 @@ BRANCH = "main"
 def _branch_info(repo):
     """Версия, лежащая в репозитории (папка DoniniPoster в ветке main) — так обновления выкладываются без «выпусков»."""
     raw = f"https://raw.githubusercontent.com/{repo}/{BRANCH}/DoniniPoster"
-    latest = _get(f"{raw}/app/VERSION", timeout=20).decode("utf-8", "replace").strip()
+    latest = _get(f"{raw}/app/VERSION?t={int(time.time())}", timeout=20).decode("utf-8", "replace").strip()
     try:
-        notes = _get(f"{raw}/" + urllib.parse.quote("ЧТО_НОВОГО.txt"), timeout=20).decode("utf-8", "replace").strip()
+        notes = _get(f"{raw}/" + urllib.parse.quote("ЧТО_НОВОГО.txt") + f"?t={int(time.time())}", timeout=20).decode("utf-8", "replace").strip()
     except Exception:
         notes = ""
     return {"latest": latest, "notes": notes[:2000],
