@@ -322,6 +322,7 @@
     </div>
     <div class="row">
       <span class="small muted" style="flex:1">Нажмите на товар — он скачается в очередь (можно нажимать подряд). ✓ — уже скачан раньше.</span>
+      <button class="sm" id="catReload" title="Подтянуть новые товары с сайта (делается само при открытии раздела и раз в 2 минуты)">⟳ Обновить с сайта</button>
       <button class="sm go" id="catAll">⬇ Все на странице</button>
       <button class="stop sm hidden" id="pullStop">■ Стоп</button>
     </div>
@@ -1415,19 +1416,29 @@ async function loadPhotosPage(){
   const pl = $("#pullLine"), cur = pl.value || (()=>{try{return localStorage.getItem("pullLine")}catch(e){return null}})();
   pl.innerHTML = `<option value="__auto">✨ Авто — по категории сайта</option>` + lineOpts(cur);
   pl.value = cur || "__auto";
-  if(!wooListsLoaded){
-    try{ const r = await (await fetch("/api/woo/lists")).json(); if(r.categories){ wooListsLoaded = true;
+  catRefresh(false);
+  pullStatus();
+}
+let catRefreshing = false, catRefreshedAt = 0;
+async function catRefresh(manual){
+  if(catRefreshing || CAT.running.size) return;
+  catRefreshing = true; catRefreshedAt = Date.now();
+  const btn = $("#catReload"); if(btn) btn.disabled = true;
+  try{
+    try{ const r = await (await fetch("/api/woo/lists?fresh=1")).json(); if(r.categories){ wooListsLoaded = true;
       const cats = r.categories.filter(c => c.count > 0).sort((a, b) => b.count - a.count);
       let sc = ""; try{ sc = localStorage.getItem("catCat") || ""; }catch(e){}
       if(sc && !cats.some(c => String(c.id) === sc)) sc = "";
       CAT.cat = sc;
       $("#catCats").innerHTML = `<button class="chip ${sc ? "" : "sel"}" data-cat="">Все товары</button>` + cats.map(c => `<button class="chip ${String(c.id) === sc ? "sel" : ""}" data-cat="${c.id}">${esc(c.name)} · ${c.count}</button>`).join(""); } }catch(e){}
-    try{ const b = await (await fetch("/api/woo/brands")).json(); if(b.brands) $("#catBrand").innerHTML = `<option value="">все бренды</option>` + b.brands.filter(x => x.count).map(x => `<option value="${x.id}">${esc(x.name)} (${x.count})</option>`).join("");
+    try{ const b = await (await fetch("/api/woo/brands?fresh=1")).json(); if(b.brands) $("#catBrand").innerHTML = `<option value="">все бренды</option>` + b.brands.filter(x => x.count).map(x => `<option value="${x.id}">${esc(x.name)} (${x.count})</option>`).join("");
       try{ const sb = localStorage.getItem("catBrand") || ""; if([...$("#catBrand").options].some(o => o.value === sb)) $("#catBrand").value = sb; }catch(e){} }catch(e){}
-    catLoad(true);
-  }
-  pullStatus();
+    await catLoad(true);
+    if(manual) toast("✓ Каталог обновлён с сайта");
+  } finally { catRefreshing = false; if(btn) btn.disabled = false; }
 }
+// пока открыт раздел «Скачать фото» — каталог сам подтягивает новые товары с сайта раз в 2 минуты
+setInterval(() => { if(page === "photos" && CAT.page === 1 && !$("#catSearch").value && Date.now() - catRefreshedAt > 110000) catRefresh(false); }, 20000);
 function renderShops(){
   const box = $("#szShops");
   if(!SHOPS.length){ box.innerHTML = `<div class="empty">Пока нет альбомов. Нажмите «🌐 Открыть 微商相册 в браузере» и откройте альбом поставщика.</div>`; return; }
@@ -1511,6 +1522,7 @@ $("#catGrid").addEventListener("click", e => {
 });
 $("#catAll").onclick = () => { const ids = CAT.items.filter(p => !p.pulled).map(p => p.id); if(!ids.length) return alert("На странице всё уже скачано."); if(confirm(`Скачать в очередь ${ids.length} товаров?`)) catPull(ids); };
 $("#catMore").onclick = () => { CAT.page++; catLoad(false); };
+$("#catReload").onclick = () => catRefresh(true);
 $("#catBrand").onchange = () => { try{ localStorage.setItem("catBrand", $("#catBrand").value); }catch(e){} catLoad(true); };
 try{ $("#catHide").checked = localStorage.getItem("catHide") === "1"; }catch(e){}
 $("#catHide").onchange = () => { try{ localStorage.setItem("catHide", $("#catHide").checked ? "1" : ""); }catch(e){} catRender(); };
@@ -1576,8 +1588,22 @@ async function updInstall(){
   if(!UPD || !UPD.available) return;
   if(!confirm(`Обновить программу до версии ${UPD.latest}?\n\nНастройки, ключи, сценарии и очередь сохранятся. Программа перезапустится сама (около 20 секунд).`)) return;
   document.body.insertAdjacentHTML("beforeend", `<div class="modal-bg"><div class="modal" style="align-items:center;text-align:center"><div class="spin" style="border-top-color:var(--accent)"></div><b>Скачиваю обновление ${esc(UPD.latest)}…</b><span class="small muted">Программа перезапустится сама, окно откроется заново.</span></div></div>`);
-  try{ const r = await post("/api/update/install"); if(r.ok === false){ alert(r.error); location.reload(); } }
-  catch(e){ location.reload(); }
+  const old = (await api("/api/version").catch(() => ({}))).version;
+  try{ const r = await post("/api/update/install"); if(r.ok === false){ alert(r.error); location.reload(); return; } }
+  catch(e){ alert("Не получилось скачать обновление: " + (e.message || e)); location.reload(); return; }
+  await waitRestart(old);
+}
+// ждём, пока программа перезапустится новой версией, и обновляем окно
+async function waitRestart(old, msgEl){
+  const t0 = Date.now();
+  while(Date.now() - t0 < 120000){
+    await new Promise(r => setTimeout(r, 1500));
+    try{
+      const r = await fetch("/api/version", {cache: "no-store"});
+      if(r.ok){ const v = (await r.json()).version; if(v && v !== old){ location.reload(); return; } }
+    }catch(e){}
+  }
+  document.querySelectorAll(".modal-bg .modal").forEach(m => m.insertAdjacentHTML("beforeend", `<span class="warn small">Программа не ответила за 2 минуты. Закройте окно и запустите её ярлыком <b>DoniniPoster</b> на рабочем столе.</span>`));
 }
 $("#updBtn").onclick = async () => {
   $("#updLbl").textContent = "Проверяю…";
@@ -1608,15 +1634,7 @@ async function applyChanges(){
   const old = PEND.running;
   document.body.insertAdjacentHTML("beforeend", `<div class="modal-bg" id="applyModal"><div class="modal" style="align-items:center;text-align:center"><div class="spin" style="border-top-color:var(--accent)"></div><b>Перезапускаю программу…</b><span class="small muted" id="applyMsg">Окно обновится само.</span></div></div>`);
   try{ await post("/api/app/restart"); }catch(e){}
-  const t0 = Date.now();
-  while(Date.now() - t0 < 90000){
-    await new Promise(r => setTimeout(r, 1500));
-    try{
-      const r = await fetch("/api/version", {cache: "no-store"});
-      if(r.ok){ const v = (await r.json()).version; if(v && v !== old){ location.reload(); return; } }
-    }catch(e){}
-  }
-  $("#applyMsg").innerHTML = `Программа не запустилась за 90 секунд. Запустите её ярлыком <b>DoniniPoster</b> на рабочем столе.`;
+  await waitRestart(old);
 }
 $("#applyBtn").onclick = applyChanges;
 pendLoad(); setInterval(pendLoad, 15000);
