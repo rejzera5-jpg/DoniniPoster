@@ -1,0 +1,19 @@
+{
+  "enabled": false,
+  "type": "plugin",
+  "plugin": "woocommerce",
+  "min_interval_min": 0.08333333333333333,
+  "jitter_pct": 0,
+  "daily_limit": 2000,
+  "max_photos": 10,
+  "title_spaces": 0,
+  "confirm_before_publish": false,
+  "scenarios": {},
+  "no_browser": true,
+  "independent": true,
+  "title_brand": true,
+  "id": "doninisklep",
+  "name": "doninisklep.com",
+  "lang": "PL",
+  "start_url": "https://doninisklep.com/"
+}

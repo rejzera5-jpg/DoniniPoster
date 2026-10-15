@@ -1,0 +1,144 @@
+{
+  "enabled": false,
+  "type": "ext",
+  "plugin": "",
+  "min_interval_min": 10,
+  "jitter_pct": 30,
+  "daily_limit": 60,
+  "max_photos": 10,
+  "title_spaces": 1,
+  "confirm_before_publish": false,
+  "scenarios": {
+    "default": [
+      {
+        "action": "goto",
+        "label": "открыть сайт",
+        "url": "https://www.kleinanzeigen.de/"
+      },
+      {
+        "action": "click",
+        "label": "Inserieren",
+        "selectors": [
+          "#nav-menu-item-post-ad",
+          "a:has-text(\"Inserieren\")",
+          "text=\"Inserieren\""
+        ]
+      },
+      {
+        "action": "fill",
+        "label": "Название",
+        "selectors": [
+          "#ad-title",
+          "input[name=\"title\"]"
+        ],
+        "value": "{title}"
+      },
+      {
+        "action": "click",
+        "label": "Mode & Beauty → Taschen & Accessoires → Taschen & Rucksäcke",
+        "selectors": [
+          "#ad-category-picker > div > label:nth-of-type(1)"
+        ]
+      },
+      {
+        "action": "click",
+        "label": "156",
+        "selectors": [
+          "#ad-category-picker-156",
+          "input[name=\"category-suggestions\"]"
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Zustand auswählen Bitte wählen",
+        "selectors": [
+          "button:has-text(\"Zustand auswählen Bitte wählen\")",
+          "text=\"Zustand auswählen Bitte wählen\"",
+          "fieldset:nth-of-type(1) > fieldset:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div > button"
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Neu mit Etikett",
+        "selectors": [
+          "label:has-text(\"Neu mit Etikett\")",
+          "text=\"Neu mit Etikett\"",
+          "div > div > div > fieldset > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > label"
+        ]
+      },
+      {
+        "action": "click",
+        "label": "new_with_tag",
+        "selectors": [
+          "dialog > div > div > div > fieldset > div:nth-of-type(1) > div:nth-of-type(1) > input"
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Bestätigen",
+        "selectors": [
+          "button:has-text(\"Bestätigen\")",
+          "text=\"Bestätigen\"",
+          "div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div > dialog > div > footer > button:nth-of-type(2)"
+        ]
+      },
+      {
+        "action": "fill",
+        "label": "Описание",
+        "selectors": [
+          "#ad-description",
+          "textarea[name=\"description\"]"
+        ],
+        "value": "{body}"
+      },
+      {
+        "action": "upload",
+        "label": "фото",
+        "multiple": true,
+        "selectors": [
+          "fieldset:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div > div:nth-of-type(1) > div > button",
+          "fieldset:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div > div:nth-of-type(1) > div > input"
+        ]
+      },
+      {
+        "action": "click",
+        "label": "Nein, “Direkt kaufen” nicht nutzen",
+        "selectors": [
+          "label:has-text(\"Nein, “Direkt kaufen” nicht nutzen\")",
+          "text=\"Nein, “Direkt kaufen” nicht nutzen\"",
+          "#ad-buy-now > div > label:nth-of-type(2)"
+        ]
+      },
+      {
+        "action": "click",
+        "label": "false",
+        "selectors": [
+          "#ad-buy-now-false",
+          "input[name=\"buyNow\"]"
+        ]
+      },
+      {
+        "action": "fill",
+        "label": "Цена",
+        "selectors": [
+          "#ad-price-amount",
+          "input[name=\"priceAmount\"]"
+        ],
+        "value": "{price}"
+      },
+      {
+        "action": "publish",
+        "label": "Anzeige aufgeben",
+        "selectors": [
+          "button:has-text(\"Anzeige aufgeben\")",
+          "text=\"Anzeige aufgeben\"",
+          "#main > div > astro-island > form > div > button:nth-of-type(2)"
+        ]
+      }
+    ]
+  },
+  "id": "kleinanzeigen",
+  "name": "Kleinanzeigen.de",
+  "lang": "DE",
+  "start_url": "https://www.kleinanzeigen.de/"
+}
