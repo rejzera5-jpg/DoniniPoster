@@ -1756,7 +1756,10 @@ def create_app(engine):
         _at = {p["id"]: min((str(st.get("at") or "") for st in p["sites"].values() if st.get("edit")), default="")
                for p in engine.state["products"].values()}
         e.sort(key=lambda x: _at.get(x["id"], ""))
-        prods = []
+        # проверка на одном — первой, без ожидания очереди
+        first = [x for x in e if any(((engine.state["products"].get(x["id"]) or {}).get("sites", {}).get(si["id"]) or {}).get("edit", {}).get("confirm") for si in x["sites"])]
+        e = [x for x in e if x not in first]
+        prods = list(first)
         while q or e:
             if q:
                 prods.append(q.pop(0))
@@ -1882,6 +1885,15 @@ def create_app(engine):
             if not (sites.get(sid, {}).get("scenarios") or {}).get("__edit"):
                 raise HTTPException(400, f"{sites.get(sid, {}).get('name', sid)}: сначала запишите, как исправлять название (кнопка «● Записать исправление»)")
         test = bool(d.get("test"))
+        if test:  # повторное нажатие «Проверить на одном» — старая проверка снимается, не копится
+            for p in engine.state["products"].values():
+                for st in (p.get("sites") or {}).values():
+                    if (st.get("edit") or {}).get("confirm"):
+                        st.pop("edit", None)
+                        st["status"] = "done"
+            cands, find = _edit_candidates(d)
+        if engine.cfg.get("edit_paused"):
+            cfg = C.load_config(); cfg["edit_paused"] = False; C.save_config(cfg); engine.cfg = C.load_config()
         n, seen = 0, set()
         for p, sid, st in cands:
             if test and sid in seen:
