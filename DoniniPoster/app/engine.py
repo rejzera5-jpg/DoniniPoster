@@ -287,7 +287,16 @@ class Engine:
         p = self.state["products"].get(pid)
         if not p or site_id not in p["sites"]:
             return False
-        p["sites"][site_id].update(status="done", url=url, at=datetime.now().isoformat(timespec="seconds"), error=None)
+        st = p["sites"][site_id]
+        if st.get("edit"):  # исправление уже выставленного объявления — ссылку и дату не трогаем
+            ed = st.pop("edit")
+            st.update(status="done", error=None, edited=datetime.now().isoformat(timespec="seconds"), title=ed.get("title"))
+            self.edit_done = getattr(self, "edit_done", 0) + 1
+            self.save()
+            site = C.get_site(site_id)
+            self.log(f"✏️ {site['name'] if site else site_id}: {p['code']} — название исправлено")
+            return True
+        st.update(status="done", url=url, at=datetime.now().isoformat(timespec="seconds"), error=None)
         self.inc_today(site_id)
         self.save()
         site = C.get_site(site_id)

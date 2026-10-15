@@ -311,6 +311,7 @@
         <select id="qStateFilter"><option value="">все</option><option value="error">только с ошибками</option></select>
         <label class="switch small"><input type="checkbox" class="showHistory"> показать выставленные</label>
         <button class="sm" id="syncManager" title="Шаблоны текстов — встроенный Donini Manager, правки применяются сразу">🧾 Шаблоны</button>
+        <button class="sm" id="editAds" title="Исправить уже выставленные объявления (например, название не по тому шаблону)">✏️ Исправить объявления</button>
         <button class="sm" id="sizesFromSite" title="Товарам, скачанным с моего сайта, у которых нет размера, — подставить размер с сайта">📏 Размеры с сайта</button>
         <button class="sm" data-tplreset="boards" title="Все товары в очереди — с текстом из текущего шаблона (убрать свои тексты ✏️)">↺ Тексты по шаблону</button>
         <button class="sm danger" data-clear="boards">🗑 Очистить</button>
@@ -1045,7 +1046,7 @@ function renderSites(){
         <h3><span>${esc(s.name)} <span class="small muted">${s.lang} · в моём браузере</span></span>
           <label class="switch"><input type="checkbox" data-f="enabled" ${s.enabled?"checked":""}> вкл</label></h3>
         <div class="small muted">Сегодня выставлено: ${s.today}${s.daily_limit ? ` / ${s.daily_limit}` : ""}.</div>
-        ${keys.length ? keys.map(k => `<div class="sc"><span>${k === "default" ? "Сценарий (общий)" : `Для «${esc(S.lines.find(l=>l.id===k)?.name || k)}»`}<br>${s.has_publish[k] ? `<span class="ok">${s.scenarios[k]} шагов</span>` : `<span class="warn">${s.scenarios[k]} шагов, нет «Опубликовать»</span>`}</span>
+        ${keys.length ? keys.map(k => `<div class="sc"><span>${k === "default" ? "Сценарий (общий)" : k === "__edit" ? "✏️ Исправление названия" : `Для «${esc(S.lines.find(l=>l.id===k)?.name || k)}»`}<br>${s.has_publish[k] ? `<span class="ok">${s.scenarios[k]} шагов</span>` : `<span class="warn">${s.scenarios[k]} шагов, нет «Опубликовать»</span>`}</span>
           <span class="row"><button class="sm" data-act="steps" data-site="${s.id}" data-line="${k}">Шаги</button><button class="sm primary" data-act="extrec" data-site="${s.id}" data-line="${k}">● Перезаписать</button></span></div>`).join("")
           : `<div class="sc"><span class="warn">Сценарий не записан</span><button class="sm primary" data-act="extrec" data-site="${s.id}" data-line="default">● Записать</button></div>`}
         ${common}
@@ -1422,6 +1423,64 @@ function modal(html, onAct){
   return bg;
 }
 
+
+// ---------- исправление уже выставленных объявлений ----------
+async function editAdsModal(){
+  const y = new Date(Date.now() - 86400000); const ymd = d => d.toISOString().slice(0, 10);
+  const sites = S.sites.filter(s => (s.type === "ext" || s.type === "manual"));
+  let prev = null;
+  const m = modal(`<h3>✏️ Исправить выставленные объявления</h3>
+    <div class="small muted">Бот откроет каждое объявление на сайте и поменяет название. По разу на каждый сайт нужно записать, как исправлять (открыть объявление → «Szerkesztés» → поле названия → кнопка «Название» в панели → «Mentés»).</div>
+    <div class="row" style="flex-wrap:wrap">${sites.map(s => `<label class="switch"><input type="checkbox" data-es="${esc(s.id)}" ${/vatera|jofogas/.test(s.id) ? "checked" : ""}> ${esc(s.name)}</label>`).join("")}</div>
+    <div class="row">
+      <label class="field">Выставлены (дата)<input id="edDate" type="date" value="${ymd(y)}"></label>
+      <label class="field" style="flex:1">Было в названии<input id="edFind" value="Női és férfi bőr táska hátizsák"></label>
+    </div>
+    <label class="field">Новое название (вместо старого; код товара останется)<input id="edRepl" placeholder="например: Női bőr táska"></label>
+    <div class="row"><button data-m="prev">🔎 Посмотреть, что исправится</button><span class="spacer"></span><span id="edStatus" class="small muted"></span></div>
+    <div id="edPrev"></div>
+    <div class="row"><button class="primary" data-m="start">▶ Исправить</button><button class="danger" data-m="cancel" title="Снять все задания исправления">Отменить исправление</button><button data-m="close">Закрыть</button></div>`, async (act, close) => {
+    const body = () => ({sites: [...m.querySelectorAll("[data-es]")].filter(c => c.checked).map(c => c.dataset.es), date: $("#edDate", m).value, find: $("#edFind", m).value, replace: $("#edRepl", m).value});
+    if(act === "close") return close();
+    if(act === "prev") return showPrev();
+    if(act === "rec"){ return; }
+    if(act === "start"){
+      if(!$("#edRepl", m).value.trim()) return alert("Впишите новое название");
+      await showPrev(); const n = prev ? prev.sites.reduce((a, x) => a + x.count, 0) : 0;
+      if(!n) return alert("Не найдено объявлений для исправления");
+      if(!confirm(`Исправить название в ${n} объявлениях?\n\nДальше запустите «▶ Авто» (или «Пачкой» по сайту) — бот откроет каждое объявление и сохранит новое название.`)) return;
+      try{ const r = await post("/api/edit/start", body()); toast(`✏️ В работе: ${r.count}. Запустите «▶ Авто»`); }catch(e){}
+      return status();
+    }
+    if(act === "cancel"){ if(!confirm("Снять все задания исправления? Объявления останутся как есть.")) return; await post("/api/edit/cancel"); toast("Исправление отменено"); return status(); }
+  });
+  m.querySelector(".modal").style.width = "min(900px,100%)";
+  async function status(){ try{ const r = await api("/api/edit/status"); $("#edStatus", m).textContent = r.left ? `в работе: ${r.left}${r.errors ? `, с ошибкой: ${r.errors}` : ""} · исправлено: ${r.done}` : (r.done ? `исправлено: ${r.done}` : ""); }catch(e){} }
+  async function showPrev(){
+    const b = {sites: [...m.querySelectorAll("[data-es]")].filter(c => c.checked).map(c => c.dataset.es), date: $("#edDate", m).value, find: $("#edFind", m).value, replace: $("#edRepl", m).value};
+    try{ prev = await post("/api/edit/preview", b); }catch(e){ return; }
+    $("#edPrev", m).innerHTML = prev.sites.length ? prev.sites.map(x => `<div class="card" style="padding:10px;margin:6px 0">
+      <b>${esc(x.name)}: ${x.count} объявлений</b>${x.no_id ? ` <span class="warn small">(у ${x.no_id} нет номера объявления — бот найдёт их по коду через поиск, если так записано)</span>` : ""}
+      <div class="row" style="margin-top:6px"><label class="field" style="flex:1">Страница объявления для исправления (можно {ad_id} — номер объявления, {code} — код товара)
+        <input data-eurl="${esc(x.site)}" value="${esc(x.edit_url || "")}" placeholder="${x.site === "vatera" ? "https://www.vatera.hu/item/mod/?id={ad_id}" : "страница «Мои объявления», где есть поиск"}"></label>
+        <button class="sm" data-esave="${esc(x.site)}">💾</button></div>
+      <div class="row">${x.edit_steps ? `<span class="ok small">Исправление записано: ${x.edit_steps} шагов</span>` : `<span class="warn small">Исправление ещё не записано</span>`}
+        <button class="sm primary" data-erec="${esc(x.site)}">● ${x.edit_steps ? "Перезаписать" : "Записать"} исправление</button></div>
+      ${x.samples.some(s => s.title) ? `<div class="small muted">Пример: ${x.samples.slice(0, 3).map(s => `<br>${esc(s.code)} → «${esc(s.title)}»`).join("")}</div>` : ""}
+    </div>`).join("") : `<div class="muted small">Нет выставленных объявлений за эту дату на выбранных сайтах.</div>`;
+    status();
+  }
+  m.addEventListener("click", async e => {
+    const sv = e.target.closest("[data-esave]"); if(sv){ await post("/api/edit/site", {site: sv.dataset.esave, edit_url: m.querySelector(`[data-eurl="${sv.dataset.esave}"]`).value}); toast("Сохранено"); return; }
+    const rc = e.target.closest("[data-erec]"); if(rc){
+      const sid = rc.dataset.erec; const u = m.querySelector(`[data-eurl="${sid}"]`).value; await post("/api/edit/site", {site: sid, edit_url: u});
+      alert("Сейчас откроется вкладка с одним из выставленных объявлений (или страница из поля выше).\n\nЗапишите: откройте редактирование → нажмите на поле названия → очистите его → кнопка «Название» в панели Donini → нажмите «Следующий клик = Опубликовать» → «Mentés/Сохранить» → «Готово — сохранить сценарий».\n\nЕсли объявление нужно сначала найти — впишите код кнопкой «Код» в поиск.");
+      await extRecord(sid, "__edit"); return;
+    }
+  });
+  showPrev();
+}
+$("#editAds").onclick = editAdsModal;
 
 // ---------- товары перетаскиванием (без проводника) ----------
 const UP = {};   // line -> {done,total,msg,err}

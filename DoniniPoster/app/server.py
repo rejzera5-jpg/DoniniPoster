@@ -1717,9 +1717,11 @@ def create_app(engine):
         ids = {s["id"]: s for s in sites}
         prods, noprice = [], []
         for p in sorted(engine.state["products"].values(), key=lambda x: x["added"]):
-            if p["status"] == "archived":
+            edit_only = p["status"] == "archived"
+            if edit_only and not any(st.get("edit") for st in p["sites"].values()):
                 continue
-            pend = [sid for sid, st in p["sites"].items() if sid in ids and st.get("status") in ("pending", "error")]
+            pend = [sid for sid, st in p["sites"].items() if sid in ids and st.get("status") in ("pending", "error")
+                    and (st.get("edit") or not edit_only)]
             if not pend:
                 continue
             from . import photo_qc
@@ -1767,6 +1769,24 @@ def create_app(engine):
             s = C.get_site(sid)
             if not s or sid not in p["sites"]:
                 continue
+            ed = (p["sites"].get(sid) or {}).get("edit")
+            if ed:
+                steps = (s.get("scenarios") or {}).get("__edit") or []
+                if not steps:
+                    raise HTTPException(400, f"{s['name']}: не записан сценарий исправления (кнопка «✏️ Исправить объявления» → «Записать»)")
+                ad = engine.build_ad(p, s, [])
+                ad["title"] = ed["title"]
+                ad_id = _ad_id(p["sites"][sid])
+                start = _edit_url(s, p, ad_id)
+                import copy
+                steps = copy.deepcopy(steps)
+                for x in steps:
+                    if x.get("action") == "goto" and x.get("url"):
+                        x["url"] = _fill_url(x["url"], p, ad_id)
+                out.append({"site": {"id": sid, "name": s["name"], "start_url": start or s["start_url"], "edit": True},
+                            "steps": ensure_publish(steps), "ad": public_ad(ad), "photos": []})
+                out[-1]["site"]["steps"] = out[-1].pop("steps")
+                continue
             photos = await asyncio.to_thread(images.prepare, p, engine.cfg.get("photo_max_side", 1600), s.get("max_photos") or None)
             while images.LAST_ERRORS:
                 engine.log("⚠️ " + images.LAST_ERRORS.pop(0))
@@ -1778,11 +1798,134 @@ def create_app(engine):
             raise HTTPException(400, "нет выбранных сайтов для этого товара")
         return {"product": {"id": p["id"], "code": p["code"]}, "sites": out}
 
+    # ---------- исправление уже выставленных объявлений (например, название не по тому шаблону) ----------
+    def _ad_id(st):
+        import re as _re
+        u = st.get("url") or ""
+        m = _re.search(r"product_id=(\d+)", u) or _re.search(r"[?&]id=(\d+)", u) or _re.search(r"(\d{6,})", u)
+        return m.group(1) if m else ""
+
+    def _fill_url(u, p, ad_id):
+        return (u or "").replace("{ad_id}", ad_id).replace("{code}", str(p.get("code") or ""))
+
+    def _edit_url(s, p, ad_id):
+        u = (s.get("edit_url") or "").strip()
+        return _fill_url(u, p, ad_id) if u else ""
+
+    def _edit_candidates(d):
+        sites = set(d.get("sites") or [])
+        day = (d.get("date") or "").strip()
+        find = (d.get("find") or "").strip()
+        out = []
+        for p in engine.state["products"].values():
+            for sid, st in (p.get("sites") or {}).items():
+                if sid not in sites or st.get("status") != "done" or st.get("edit"):
+                    continue
+                if day and not str(st.get("at") or "").startswith(day):
+                    continue
+                out.append((p, sid, st))
+        return out, find
+
+    def _new_title(p, s, find, repl):
+        ad = engine.build_ad(p, s, [])
+        t = ad["title"]
+        if find and find.lower() in t.lower():
+            import re as _re
+            return _re.sub(_re.escape(find), repl, t, flags=_re.I).strip()
+        brand = ad.get("brand") if (s.get("title_brand") and not p.get("no_brand")) else ""
+        return " ".join(x for x in (repl, brand, str(p.get("code") or "")) if x).strip()
+
+    @app.post("/api/edit/preview")
+    async def edit_preview(req: Request):
+        d = await req.json()
+        cands, find = _edit_candidates(d)
+        repl = (d.get("replace") or "").strip()
+        by = {}
+        sites = {s["id"]: s for s in C.load_sites()}
+        for p, sid, st in cands:
+            by.setdefault(sid, []).append((p, st))
+        res = []
+        for sid, items in by.items():
+            s = sites.get(sid) or {"id": sid, "name": sid}
+            samples = [{"code": p.get("code"), "ad_id": _ad_id(st), "title": _new_title(p, s, find, repl) if repl else ""} for p, st in items[:6]]
+            res.append({"site": sid, "name": s.get("name", sid), "count": len(items), "samples": samples,
+                        "no_id": sum(1 for p, st in items if not _ad_id(st)),
+                        "edit_url": s.get("edit_url", ""), "edit_steps": len((s.get("scenarios") or {}).get("__edit") or [])})
+        return {"sites": res}
+
+    @app.post("/api/edit/start")
+    async def edit_start(req: Request):
+        d = await req.json()
+        repl = (d.get("replace") or "").strip()
+        if not repl:
+            raise HTTPException(400, "Впишите новое название")
+        cands, find = _edit_candidates(d)
+        sites = {s["id"]: s for s in C.load_sites()}
+        for sid in {sid for _, sid, _ in cands}:
+            if not (sites.get(sid, {}).get("scenarios") or {}).get("__edit"):
+                raise HTTPException(400, f"{sites.get(sid, {}).get('name', sid)}: сначала запишите, как исправлять название (кнопка «● Записать исправление»)")
+        n = 0
+        for p, sid, st in cands:
+            st["edit"] = {"title": _new_title(p, sites[sid], find, repl), "prev_at": st.get("at")}
+            st["status"] = "pending"
+            n += 1
+        engine.save()
+        engine.log(f"✏️ Исправление объявлений: поставлено в работу {n} (сайты: {', '.join(sorted({sites[s]['name'] for _, s, _ in cands}))}). Запустите «▶ Авто» или «Пачкой».")
+        return {"ok": True, "count": n}
+
+    @app.get("/api/edit/status")
+    async def edit_status():
+        left = err = 0
+        for p in engine.state["products"].values():
+            for st in (p.get("sites") or {}).values():
+                if st.get("edit"):
+                    left += 1
+                    err += st.get("status") == "error"
+        return {"left": left, "errors": err, "done": getattr(engine, "edit_done", 0)}
+
+    @app.post("/api/edit/cancel")
+    async def edit_cancel():
+        n = 0
+        for p in engine.state["products"].values():
+            for st in (p.get("sites") or {}).values():
+                if st.pop("edit", None) is not None:
+                    st["status"] = "done"
+                    st.pop("error", None)
+                    n += 1
+        engine.save()
+        engine.log(f"✏️ Исправление объявлений отменено: {n} шт. остались как были")
+        return {"ok": True, "count": n}
+
+    @app.post("/api/edit/site")
+    async def edit_site(req: Request):
+        d = await req.json()
+        s = C.get_site(d.get("site"))
+        if not s:
+            raise HTTPException(404)
+        s["edit_url"] = (d.get("edit_url") or "").strip()
+        C.save_site(s)
+        return {"ok": True}
+
     @app.get("/api/ext/sample")
     async def ext_sample(site: str, line: str = "default"):
         s = C.get_site(site)
         if not s:
             raise HTTPException(404, "сайт не найден")
+        if line == "__edit":  # запись исправления: открываем настоящее выставленное объявление
+            last = None
+            for p in engine.state["products"].values():
+                st = (p.get("sites") or {}).get(site) or {}
+                if (st.get("status") == "done" or st.get("edit")) and (not last or str(st.get("at")) > str(last[1].get("at"))):
+                    last = (p, st)
+            ad = await asyncio.to_thread(engine.sample_ad, s, "default")
+            start = s["start_url"]
+            if last:
+                ad = engine.build_ad(last[0], s, [])
+                ad["photos"] = []
+                start = _edit_url(s, last[0], _ad_id(last[1])) or start
+            ad["title"] = "НОВОЕ НАЗВАНИЕ " + str(ad.get("code") or "")
+            return {"site": {"id": s["id"], "name": s["name"], "start_url": start}, "line_name": "✏️ исправление",
+                    "ad": public_ad(ad), "photos": []}
         ad = await asyncio.to_thread(engine.sample_ad, s, line)
         ln = engine.line(line)
         return {"site": {"id": s["id"], "name": s["name"], "start_url": s["start_url"]},
@@ -1801,6 +1944,8 @@ def create_app(engine):
         C.save_site(s)
         has_pub = any(x["action"] == "publish" for x in steps)
         ln = engine.line(d.get("line") or "default")
+        if d.get("line") == "__edit":
+            ln = {"name": "✏️ исправление названия"}
         engine.log(f"💾 Сценарий {s['name']}{' для линии «' + ln['name'] + '»' if ln else ' (общий)'} сохранён из браузера: {len(steps)} шагов" +
                    ("" if has_pub else " — ⚠️ не отмечена кнопка «Опубликовать»"))
         return {"ok": True, "steps": len(steps), "has_publish": has_pub}
