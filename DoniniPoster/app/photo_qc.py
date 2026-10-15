@@ -13,8 +13,10 @@ from PIL import Image, ImageFile, ImageFilter, ImageStat
 
 MIN_SIDE = 400
 # во сколько раз резкость ниже средней по товару, чтобы считать фото замыленным (меньше — строже)
-BLUR_RATIO = {"soft": 0.07, "normal": 0.12, "strict": 0.2}
-BLUR_ABS = {"soft": 20, "normal": 40, "strict": 80}  # и одновременно ниже этого числа
+# замыленное: чёткость ниже ABS — всегда; ниже REL от средней по товару и ниже REL_MAX — тоже
+BLUR_ABS = {"soft": 24, "normal": 32, "strict": 38}
+BLUR_REL = {"soft": 0.4, "normal": 0.5, "strict": 0.6}
+BLUR_REL_MAX = {"soft": 45, "normal": 55, "strict": 65}
 
 
 def _open(path):
@@ -25,11 +27,21 @@ def _open(path):
 
 
 def _sharpness(gray):
-    """Резкость: разброс «краёв» на уменьшенной копии (чем больше — тем чётче)."""
+    """Чёткость: насколько резкие самые чёткие края на фото (строчка, логотип, край коробки).
+    Фото приводится к 1024 px, чтобы большие и маленькие фото сравнивались честно.
+    У нормального фото такие края есть всегда (≈40 и выше), у замыленного / растянутого из маленького — нет (≈10–30)."""
+    from PIL import ImageChops
     g = gray.copy()
-    g.thumbnail((800, 800))
-    edges = g.filter(ImageFilter.Kernel((3, 3), [0, 1, 0, 1, -4, 1, 0, 1, 0], scale=1, offset=128))
-    return ImageStat.Stat(edges).var[0]
+    g.thumbnail((1024, 1024))
+    lap = g.filter(ImageFilter.Kernel((3, 3), [0, 1, 0, 1, -4, 1, 0, 1, 0], scale=1, offset=128))
+    d = ImageChops.difference(lap, Image.new("L", lap.size, 128))
+    h = d.histogram()
+    n, acc = sum(h), 0
+    for v in range(255, -1, -1):
+        acc += h[v]
+        if acc >= n * 0.005:  # самые резкие 0,5% точек
+            return v
+    return 0
 
 
 def _blank_tail(im):
@@ -56,7 +68,7 @@ def _blank_tail(im):
     return worst
 
 
-QC_VER = 2
+QC_VER = 3
 
 
 def check_one(path):
@@ -110,15 +122,14 @@ def check_product(paths, level="normal"):
     res = {p: check_one(p) for p in paths}
     good = [p for p, r in res.items() if r["ok"]]
     bad = {p: r["reason"] for p, r in res.items() if not r["ok"]}
-    if len(good) >= 3:
-        vals = sorted(res[p]["sharp"] for p in good)
-        med = vals[len(vals) // 2]
-        for p in good:
-            s = res[p]["sharp"]
-            r = BLUR_RATIO.get(level, 0.12)
-            # сильно мягче остальных фото товара — или заметно мягче и при этом совсем без деталей
-            if s < med * r * 0.45 or (s < med * r and s < BLUR_ABS.get(level, 40)):
-                bad[p] = "замыленное"
+    vals = sorted(res[p]["sharp"] for p in good)
+    med = vals[len(vals) // 2] if vals else 0
+    for p in good:
+        sh = res[p]["sharp"]
+        if sh < BLUR_ABS.get(level, 32):
+            bad[p] = f"замыленное (чёткость {sh})"
+        elif len(good) >= 3 and sh < med * BLUR_REL.get(level, 0.5) and sh < BLUR_REL_MAX.get(level, 55):
+            bad[p] = f"замыленное — мягче остальных фото (чёткость {sh}, у остальных ~{med})"
     if len(bad) >= len(paths) and paths:
         # всё «плохое» — оставляем лучшее, чтобы товар не остался без фото
         best = max(paths, key=lambda p: res[p]["sharp"])
@@ -148,7 +159,7 @@ def loop(engine):
                 engine._qc_fixed = True
                 n = restore_wrong(engine)
                 if n:
-                    engine.log(f"♻️ Вернул фото, ошибочно убранные проверкой («фото обрезано»): товаров {n} — проверяю их заново")
+                    engine.log(f"🧹 Новая проверка фото: перепроверяю товары в очереди — {n} шт.")
                     engine.save()
             todo = [] if level == "off" else [p for p in list(engine.state["products"].values())
                                                if p.get("status") != "archived" and not p.get("qc_done")]
@@ -179,8 +190,10 @@ def restore_wrong(engine):
     n = 0
     for p in engine.state["products"].values():
         bad = p.get("qc_bad") or {}
-        if p.get("qc_ver") == QC_VER or not any("обрезано" in str(v) for v in bad.values()):
+        if p.get("status") == "archived" or p.get("qc_ver") == QC_VER or not p.get("qc_done"):
             continue
+        if p.get("photos_locked") and not bad:
+            continue  # фото выбраны вручную в карточке — не трогаем
         f = Path(p.get("folder") or "")
         allp = queue_store.list_photos(f) if f.is_dir() else [x for x in p.get("kept") or [] if Path(x).exists()]
         if allp:
