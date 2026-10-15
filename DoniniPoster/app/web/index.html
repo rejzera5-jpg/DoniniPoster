@@ -1438,7 +1438,8 @@ function editsPage(){
   const m = $("#editsCard");
   m.innerHTML = `<h3>✏️ Исправить выставленные объявления</h3>
     <div class="small muted">Бот откроет каждое объявление на сайте и поменяет название. По разу на каждый сайт нужно записать, как исправлять (открыть объявление → «Szerkesztés» → поле названия → кнопка «Название» в панели → «Mentés»).</div>
-    <div class="row" style="flex-wrap:wrap">${sites.map(s => `<label class="switch"><input type="checkbox" data-es="${esc(s.id)}" ${/vatera|jofogas/.test(s.id) ? "checked" : ""}> ${esc(s.name)}</label>`).join("")}</div>
+    <div class="row" style="flex-wrap:wrap">${sites.map(s => `<label class="switch"><input type="checkbox" data-es="${esc(s.id)}" ${/vatera/.test(s.id) ? "checked" : ""}> ${esc(s.name)}</label>`).join("")}</div>
+    <div class="small muted">Исправляются только отмеченные сайты.</div>
     <div class="row">
       <label class="field">Выставлены (дата)<input id="edDate" type="date" value="${ymd(y)}"></label>
       <label class="field" style="flex:1">Было в названии<input id="edFind" value="Női és férfi bőr táska hátizsák"></label>
@@ -1446,9 +1447,10 @@ function editsPage(){
     <label class="field">Новое название (вместо старого; код товара останется)<input id="edRepl" placeholder="например: Női bőr táska"></label>
     <div class="row"><button data-m="prev">🔎 Посмотреть, что исправится</button><span class="spacer"></span><span id="edStatus" class="small muted"></span></div>
     <div id="edPrev"></div>
-    <div class="row"><button class="primary" data-m="start">▶ Исправить</button><button data-m="pause" id="edPauseBtn">⏸ Пауза</button><button class="danger" data-m="cancel" title="Снять все задания исправления">Отменить исправление</button></div>
+    <div class="row"><button data-m="test" title="Бот исправит только первое объявление и остановится перед сохранением — нажмёте сами. Очередь в это время работает как обычно">🧪 Проверить на одном</button><button class="primary" data-m="start">▶ Исправить все</button><button data-m="pause" id="edPauseBtn">⏸ Пауза</button><button class="danger" data-m="cancel" title="Снять все задания исправления">Отменить исправление</button></div>
     <div class="small muted">Исправления идут через то же расширение, вперемешку с очередью: один товар из очереди, одно исправление — очередь не останавливается. Должен работать «▶ Авто».</div>`;
   m.addEventListener("click", async e => { const b = e.target.closest("[data-m]"); if(b) onAct(b.dataset.m); });
+  m.addEventListener("change", e => { if(e.target.matches("[data-es]")) showPrev(); });
   async function onAct(act){
     const body = () => ({sites: [...m.querySelectorAll("[data-es]")].filter(c => c.checked).map(c => c.dataset.es), date: $("#edDate", m).value, find: $("#edFind", m).value, replace: $("#edRepl", m).value});
     if(act === "prev") return showPrev();
@@ -1459,6 +1461,12 @@ function editsPage(){
       if(!n) return alert("Не найдено объявлений для исправления");
       if(!confirm(`Исправить название в ${n} объявлениях?\n\nДальше запустите «▶ Авто» (или «Пачкой» по сайту) — бот откроет каждое объявление и сохранит новое название.`)) return;
       try{ const r = await post("/api/edit/start", body()); toast(`✏️ В работе: ${r.count}. Запустите «▶ Авто»`); }catch(e){}
+      return status();
+    }
+    if(act === "test"){
+      if(!$("#edRepl", m).value.trim()) return alert("Впишите новое название");
+      try{ const r = await post("/api/edit/start", {...body(), test: true}); toast(`🧪 Проверка: ${r.count} объявление(я). Бот откроет его в очереди «▶ Авто» и остановится перед сохранением`); }catch(e){}
+      alert("Бот откроет первое объявление (по одному на каждый выбранный сайт), впишет новое название и ОСТАНОВИТСЯ перед сохранением — даже в режиме «без меня».\n\nПроверьте: это редактирование нужного объявления, название новое → нажмите подсвеченную кнопку сами. Потом проверьте объявление на сайте.\n\nПока вы не нажмёте, следующий товар очереди ждёт.");
       return status();
     }
     if(act === "cancel"){ if(!confirm("Снять все задания исправления? Объявления останутся как есть.")) return; await post("/api/edit/cancel"); toast("Исправление отменено"); return status(); }

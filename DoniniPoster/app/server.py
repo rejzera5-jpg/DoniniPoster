@@ -1715,26 +1715,28 @@ def create_app(engine):
     async def ext_state():
         sites = ext_sites()
         ids = {s["id"]: s for s in sites}
+        all_ids = {s["id"]: s for s in C.load_sites() if s.get("type") in ("ext", "manual")}
         prods, noprice = [], []
         for p in sorted(engine.state["products"].values(), key=lambda x: x["added"]):
             edit_only = p["status"] == "archived"
             if edit_only and (engine.cfg.get("edit_paused") or not any(st.get("edit") for st in p["sites"].values())):
                 continue
-            pend = [sid for sid, st in p["sites"].items() if sid in ids and st.get("status") in ("pending", "error")
-                    and (st.get("edit") or not edit_only) and not (st.get("edit") and engine.cfg.get("edit_paused"))]
+            pend = [sid for sid, st in p["sites"].items() if st.get("status") in ("pending", "error")
+                    and ((st.get("edit") and sid in all_ids and not engine.cfg.get("edit_paused"))  # исправления — и на выключенном сайте
+                         or (not st.get("edit") and not edit_only and sid in ids))]
             if not pend:
                 continue
             from . import photo_qc
-            if photo_qc.pending(p, engine.cfg):  # фото ещё проверяются — через пару секунд
+            if not edit_only and photo_qc.pending(p, engine.cfg):  # фото ещё проверяются — через пару секунд
                 continue
-            if p.get("qc_allbad") and (engine.cfg.get("photo_qc") or "normal") != "off":
+            if not edit_only and p.get("qc_allbad") and (engine.cfg.get("photo_qc") or "normal") != "off":
                 for sid in pend:
                     st = p["sites"][sid]
                     if st.get("error") != ALL_BAD:
                         st.update(status="error", error=ALL_BAD)
                         noprice.append(p.get("code"))
                 continue
-            if not float(p.get("price") or 0) > 0:
+            if not edit_only and not float(p.get("price") or 0) > 0:
                 # без цены доски не дают выставить (OLX прячет доставку) — не открываем, сразу видно, что не так
                 for sid in pend:
                     st = p["sites"][sid]
@@ -1746,11 +1748,14 @@ def create_app(engine):
             prods.append({"id": p["id"], "code": p["code"], "name": p["name"], "size": p.get("size", ""), "line": line,
                           "price": p.get("price"), "photos": len(p["photos"]),
                           "thumb": "/api/thumb?path=" + __import__("urllib.parse").parse.quote(p["photos"][0]) if p["photos"] else "",
-                          "sites": [{"id": sid, "name": ids[sid]["name"], "has_steps": bool(engine.scenario_for(ids[sid], line))} for sid in pend],
+                          "sites": [{"id": sid, "name": all_ids[sid]["name"], "has_steps": bool(engine.scenario_for(all_ids[sid], line))} for sid in pend],
                           "edit": edit_only})
         # исправления идут вперемешку с очередью (1 товар из очереди, 1 исправление) — очередь не стоит
         q = [x for x in prods if not x.get("edit")]
         e = [x for x in prods if x.get("edit")]
+        _at = {p["id"]: min((str(st.get("at") or "") for st in p["sites"].values() if st.get("edit")), default="")
+               for p in engine.state["products"].values()}
+        e.sort(key=lambda x: _at.get(x["id"], ""))
         prods = []
         while q or e:
             if q:
@@ -1793,7 +1798,8 @@ def create_app(engine):
                 for x in steps:
                     if x.get("action") == "goto" and x.get("url"):
                         x["url"] = _fill_url(x["url"], p, ad_id)
-                out.append({"site": {"id": sid, "name": s["name"], "start_url": start or s["start_url"], "edit": True},
+                out.append({"site": {"id": sid, "name": s["name"], "start_url": start or s["start_url"], "edit": True,
+                                     "confirm": bool(ed.get("confirm"))},
                             "steps": ensure_publish(steps), "ad": public_ad(ad), "photos": []})
                 out[-1]["site"]["steps"] = out[-1].pop("steps")
                 continue
@@ -1834,6 +1840,7 @@ def create_app(engine):
                 if day and not str(st.get("at") or "").startswith(day):
                     continue
                 out.append((p, sid, st))
+        out.sort(key=lambda x: str(x[2].get("at") or ""))
         return out, find
 
     def _new_title(p, s, find, repl):
@@ -1874,10 +1881,17 @@ def create_app(engine):
         for sid in {sid for _, sid, _ in cands}:
             if not (sites.get(sid, {}).get("scenarios") or {}).get("__edit"):
                 raise HTTPException(400, f"{sites.get(sid, {}).get('name', sid)}: сначала запишите, как исправлять название (кнопка «● Записать исправление»)")
-        n = 0
+        test = bool(d.get("test"))
+        n, seen = 0, set()
         for p, sid, st in cands:
-            st["edit"] = {"title": _new_title(p, sites[sid], find, repl), "prev_at": st.get("at")}
+            if test and sid in seen:
+                continue  # проверка: только первое объявление на каждом сайте
+            t = _new_title(p, sites[sid], find, repl)
+            if st.get("title") == t:
+                continue  # уже исправлено на это название
+            st["edit"] = {"title": t, "prev_at": st.get("at"), **({"confirm": True} if test else {})}
             st["status"] = "pending"
+            seen.add(sid)
             n += 1
         engine.save()
         engine.log(f"✏️ Исправление объявлений: поставлено в работу {n} (сайты: {', '.join(sorted({sites[s]['name'] for _, s, _ in cands}))}). Запустите «▶ Авто» или «Пачкой».")
