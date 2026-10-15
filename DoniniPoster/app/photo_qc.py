@@ -20,6 +20,9 @@ MIN_SIDE = 400
 # Замер на 3853 фото сайта (Louis Vuitton): у целых фото чёткость почти всегда 20 и выше,
 # по-настоящему «не в фокусе» — 8–15. Порог ниже этого, чтобы не трогать мягкие снимки деталей.
 BLUR_ABS = {"soft": 12, "normal": 16, "strict": 20}
+# Обрезанный прогрессивный JPEG: если сохранилось мало данных (бит на точку), мелкая фактура пропала — «мыло»,
+# хотя крупные контуры остаются. Замер по сайту: до ~0,3 — мыльно (12–40 КБ на 1080 px), от ~0,35 — нормально.
+TRUNC_BPP = {"soft": 0.15, "normal": 0.30, "strict": 0.40}
 
 
 def _open(path):
@@ -72,7 +75,7 @@ def _blank_tail(im):
     return worst
 
 
-QC_VER = 5
+QC_VER = 6
 
 
 def truncated(path):
@@ -94,7 +97,7 @@ def truncated(path):
     return False
 
 
-def check_one(path):
+def check_one(path, level="normal"):
     """{ok, reason, sharp} для одного фото."""
     # Обрезанный файл (например, после неудачной оптимизации на сайте) ещё не значит плохое фото:
     # если оборвались последние «слои», фото выглядит нормально. Судим по тому, как фото выглядит.
@@ -106,6 +109,14 @@ def check_one(path):
     try:
         if min(im.size) < MIN_SIDE:
             return {"ok": False, "reason": f"слишком маленькое ({im.size[0]}×{im.size[1]})", "sharp": 0}
+        if trunc and (im.info.get("progressive") or im.info.get("progression")):
+            try:
+                bpp = Path(path).stat().st_size * 8 / float(im.size[0] * im.size[1])
+            except (OSError, ZeroDivisionError):
+                bpp = 1
+            if bpp < TRUNC_BPP.get(level, 0.30):
+                kb = Path(path).stat().st_size // 1024
+                return {"ok": False, "reason": f"мыло — файл обрезан, сохранилось мало ({kb} КБ)", "sharp": 0, "trunc": True}
         gray = im.convert("L")
         if ImageStat.Stat(gray).stddev[0] < 6:
             return {"ok": False, "reason": "пустое фото — картинки нет" + (" (файл обрезан)" if trunc else ""), "sharp": 0}
@@ -137,7 +148,7 @@ def check_product(paths, level="normal"):
         else:
             seen[h] = p
     paths = [p for p in paths if p not in dup]
-    res = {p: check_one(p) for p in paths}
+    res = {p: check_one(p, level) for p in paths}
     good = [p for p, r in res.items() if r["ok"]]
     bad = {p: r["reason"] for p, r in res.items() if not r["ok"]}
     for p in good:
