@@ -72,7 +72,7 @@ def _blank_tail(im):
     return worst
 
 
-QC_VER = 4
+QC_VER = 5
 
 
 def truncated(path):
@@ -96,8 +96,9 @@ def truncated(path):
 
 def check_one(path):
     """{ok, reason, sharp} для одного фото."""
-    if truncated(path):
-        return {"ok": False, "reason": "недокачанное фото — файл обрезан, поэтому размытое или пустое", "sharp": 0, "trunc": True}
+    # Обрезанный файл (например, после неудачной оптимизации на сайте) ещё не значит плохое фото:
+    # если оборвались последние «слои», фото выглядит нормально. Судим по тому, как фото выглядит.
+    trunc = truncated(path)
     try:
         im = _open(path)
     except Exception:
@@ -105,10 +106,13 @@ def check_one(path):
     try:
         if min(im.size) < MIN_SIDE:
             return {"ok": False, "reason": f"слишком маленькое ({im.size[0]}×{im.size[1]})", "sharp": 0}
+        gray = im.convert("L")
+        if ImageStat.Stat(gray).stddev[0] < 6:
+            return {"ok": False, "reason": "пустое фото — картинки нет" + (" (файл обрезан)" if trunc else ""), "sharp": 0}
         tail = _blank_tail(im)
         if tail >= 0.12:
             return {"ok": False, "reason": f"части фото нет (~{int(tail * 100)}% пустое)", "sharp": 0}
-        return {"ok": True, "reason": "", "sharp": _sharpness(im.convert("L"))}
+        return {"ok": True, "reason": "", "sharp": _sharpness(gray), "trunc": trunc}
     finally:
         try:
             im.close()
@@ -139,7 +143,8 @@ def check_product(paths, level="normal"):
     for p in good:
         sh = res[p]["sharp"]
         if sh < BLUR_ABS.get(level, 16):
-            bad[p] = f"не в фокусе — размытое (чёткость {sh})"
+            bad[p] = (f"размытое — файл обрезан (чёткость {sh})" if res[p].get("trunc")
+                      else f"не в фокусе — размытое (чёткость {sh})")
     if len(bad) >= len(paths) and paths:
         # всё «плохое»: если есть хоть одно целое фото — оставляем лучшее из целых; недокачанные не оставляем
         whole = [p for p in paths if res[p]["ok"]]  # открывается целиком (пусть и мягкое)
