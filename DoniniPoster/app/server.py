@@ -1718,10 +1718,10 @@ def create_app(engine):
         prods, noprice = [], []
         for p in sorted(engine.state["products"].values(), key=lambda x: x["added"]):
             edit_only = p["status"] == "archived"
-            if edit_only and not any(st.get("edit") for st in p["sites"].values()):
+            if edit_only and (engine.cfg.get("edit_paused") or not any(st.get("edit") for st in p["sites"].values())):
                 continue
             pend = [sid for sid, st in p["sites"].items() if sid in ids and st.get("status") in ("pending", "error")
-                    and (st.get("edit") or not edit_only)]
+                    and (st.get("edit") or not edit_only) and not (st.get("edit") and engine.cfg.get("edit_paused"))]
             if not pend:
                 continue
             from . import photo_qc
@@ -1746,7 +1746,17 @@ def create_app(engine):
             prods.append({"id": p["id"], "code": p["code"], "name": p["name"], "size": p.get("size", ""), "line": line,
                           "price": p.get("price"), "photos": len(p["photos"]),
                           "thumb": "/api/thumb?path=" + __import__("urllib.parse").parse.quote(p["photos"][0]) if p["photos"] else "",
-                          "sites": [{"id": sid, "name": ids[sid]["name"], "has_steps": bool(engine.scenario_for(ids[sid], line))} for sid in pend]})
+                          "sites": [{"id": sid, "name": ids[sid]["name"], "has_steps": bool(engine.scenario_for(ids[sid], line))} for sid in pend],
+                          "edit": edit_only})
+        # исправления идут вперемешку с очередью (1 товар из очереди, 1 исправление) — очередь не стоит
+        q = [x for x in prods if not x.get("edit")]
+        e = [x for x in prods if x.get("edit")]
+        prods = []
+        while q or e:
+            if q:
+                prods.append(q.pop(0))
+            if e:
+                prods.append(e.pop(0))
         if noprice:
             engine.save()
             codes = sorted(set(noprice))
@@ -1881,7 +1891,17 @@ def create_app(engine):
                 if st.get("edit"):
                     left += 1
                     err += st.get("status") == "error"
-        return {"left": left, "errors": err, "done": getattr(engine, "edit_done", 0)}
+        return {"left": left, "errors": err, "done": getattr(engine, "edit_done", 0), "paused": bool(engine.cfg.get("edit_paused"))}
+
+    @app.post("/api/edit/pause")
+    async def edit_pause(req: Request):
+        d = await req.json()
+        cfg = C.load_config()
+        cfg["edit_paused"] = bool(d.get("paused"))
+        C.save_config(cfg)
+        engine.cfg = C.load_config()
+        engine.log("✏️ Исправление объявлений: " + ("пауза" if cfg["edit_paused"] else "продолжаю (вперемешку с очередью)"))
+        return {"ok": True, "paused": cfg["edit_paused"]}
 
     @app.post("/api/edit/cancel")
     async def edit_cancel():

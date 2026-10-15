@@ -204,6 +204,7 @@
   <button class="nav" data-page="insta"><span class="ic">📸</span><span class="lbl">Instagram</span><span class="badge">скоро</span></button>
   <div class="navsep"></div>
   <button class="nav" data-page="help"><span class="ic">📘</span><span class="lbl">Инструкция</span></button>
+  <button class="nav" data-page="edits"><span class="ic">✏️</span><span class="lbl">Исправить объявления</span><span class="badge hidden" id="bEdits"></span></button>
   <button class="nav" data-page="log"><span class="ic">📜</span><span class="lbl">Журнал</span><span class="badge err hidden" id="bLog"></span></button>
   <button class="nav" data-page="settings"><span class="ic">⚙️</span><span class="lbl">Настройки</span></button>
   <div class="side-foot" id="sideFoot"></div>
@@ -311,7 +312,6 @@
         <select id="qStateFilter"><option value="">все</option><option value="error">только с ошибками</option></select>
         <label class="switch small"><input type="checkbox" class="showHistory"> показать выставленные</label>
         <button class="sm" id="syncManager" title="Шаблоны текстов — встроенный Donini Manager, правки применяются сразу">🧾 Шаблоны</button>
-        <button class="sm" id="editAds" title="Исправить уже выставленные объявления (например, название не по тому шаблону)">✏️ Исправить объявления</button>
         <button class="sm" id="sizesFromSite" title="Товарам, скачанным с моего сайта, у которых нет размера, — подставить размер с сайта">📏 Размеры с сайта</button>
         <button class="sm" data-tplreset="boards" title="Все товары в очереди — с текстом из текущего шаблона (убрать свои тексты ✏️)">↺ Тексты по шаблону</button>
         <button class="sm danger" data-clear="boards">🗑 Очистить</button>
@@ -475,6 +475,8 @@
 </section>
 
 <!-- ============ ЖУРНАЛ ============ -->
+<section class="page hidden" id="page-edits"><div class="card" id="editsCard"></div></section>
+
 <section class="page hidden" id="page-log">
   <div class="row">
     <input id="logSearch" placeholder="Поиск: код товара, сайт…" style="flex:1;max-width:360px">
@@ -608,7 +610,7 @@ const extMark = () => EXT.ok;
 function openExt(url){ const a = document.createElement("a"); a.href = url; a.target = "_blank"; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove(); }
 
 // ---------- страницы ----------
-const TITLES = {help:"Инструкция", home:"Главная", site:"Мой сайт", boards:"Доски объявлений", photos:"Скачать фото", manager:"Donini Manager", sites:"Сайты и сценарии", lines:"Виды товара", insta:"Instagram", log:"Журнал", settings:"Настройки"};
+const TITLES = {edits:"Исправить объявления", help:"Инструкция", home:"Главная", site:"Мой сайт", boards:"Доски объявлений", photos:"Скачать фото", manager:"Donini Manager", sites:"Сайты и сценарии", lines:"Виды товара", insta:"Instagram", log:"Журнал", settings:"Настройки"};
 function go(p){
   page = p;
   $$(".nav").forEach(b => b.classList.toggle("active", b.dataset.page === p));
@@ -620,6 +622,7 @@ function go(p){
   if(p === "site") wooLoad();
   if(p === "photos") loadPhotosPage();
   if(p === "manager") openManagerTpl(null, true);
+  if(p === "edits") editsPage();
   if(p === "manager" || p === "boards" || p === "site") api("/api/meta").then(m => { META = m; }).catch(() => {});
   render(true);
 }
@@ -1425,11 +1428,15 @@ function modal(html, onAct){
 
 
 // ---------- исправление уже выставленных объявлений ----------
-async function editAdsModal(){
-  const y = new Date(Date.now() - 86400000); const ymd = d => d.toISOString().slice(0, 10);
+let EDIT_INIT = false;
+function editsPage(){
+  if(EDIT_INIT) return editsRefresh && editsRefresh();
+  EDIT_INIT = true;
+  const y = new Date(Date.now() - 86400000); const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;  // по местному времени
   const sites = S.sites.filter(s => (s.type === "ext" || s.type === "manual"));
   let prev = null;
-  const m = modal(`<h3>✏️ Исправить выставленные объявления</h3>
+  const m = $("#editsCard");
+  m.innerHTML = `<h3>✏️ Исправить выставленные объявления</h3>
     <div class="small muted">Бот откроет каждое объявление на сайте и поменяет название. По разу на каждый сайт нужно записать, как исправлять (открыть объявление → «Szerkesztés» → поле названия → кнопка «Название» в панели → «Mentés»).</div>
     <div class="row" style="flex-wrap:wrap">${sites.map(s => `<label class="switch"><input type="checkbox" data-es="${esc(s.id)}" ${/vatera|jofogas/.test(s.id) ? "checked" : ""}> ${esc(s.name)}</label>`).join("")}</div>
     <div class="row">
@@ -1439,11 +1446,13 @@ async function editAdsModal(){
     <label class="field">Новое название (вместо старого; код товара останется)<input id="edRepl" placeholder="например: Női bőr táska"></label>
     <div class="row"><button data-m="prev">🔎 Посмотреть, что исправится</button><span class="spacer"></span><span id="edStatus" class="small muted"></span></div>
     <div id="edPrev"></div>
-    <div class="row"><button class="primary" data-m="start">▶ Исправить</button><button class="danger" data-m="cancel" title="Снять все задания исправления">Отменить исправление</button><button data-m="close">Закрыть</button></div>`, async (act, close) => {
+    <div class="row"><button class="primary" data-m="start">▶ Исправить</button><button data-m="pause" id="edPauseBtn">⏸ Пауза</button><button class="danger" data-m="cancel" title="Снять все задания исправления">Отменить исправление</button></div>
+    <div class="small muted">Исправления идут через то же расширение, вперемешку с очередью: один товар из очереди, одно исправление — очередь не останавливается. Должен работать «▶ Авто».</div>`;
+  m.addEventListener("click", async e => { const b = e.target.closest("[data-m]"); if(b) onAct(b.dataset.m); });
+  async function onAct(act){
     const body = () => ({sites: [...m.querySelectorAll("[data-es]")].filter(c => c.checked).map(c => c.dataset.es), date: $("#edDate", m).value, find: $("#edFind", m).value, replace: $("#edRepl", m).value});
-    if(act === "close") return close();
     if(act === "prev") return showPrev();
-    if(act === "rec"){ return; }
+    if(act === "pause"){ const r = await api("/api/edit/status"); await post("/api/edit/pause", {paused: !r.paused}); return status(); }
     if(act === "start"){
       if(!$("#edRepl", m).value.trim()) return alert("Впишите новое название");
       await showPrev(); const n = prev ? prev.sites.reduce((a, x) => a + x.count, 0) : 0;
@@ -1453,9 +1462,13 @@ async function editAdsModal(){
       return status();
     }
     if(act === "cancel"){ if(!confirm("Снять все задания исправления? Объявления останутся как есть.")) return; await post("/api/edit/cancel"); toast("Исправление отменено"); return status(); }
-  });
-  m.querySelector(".modal").style.width = "min(900px,100%)";
-  async function status(){ try{ const r = await api("/api/edit/status"); $("#edStatus", m).textContent = r.left ? `в работе: ${r.left}${r.errors ? `, с ошибкой: ${r.errors}` : ""} · исправлено: ${r.done}` : (r.done ? `исправлено: ${r.done}` : ""); }catch(e){} }
+  }
+  async function status(){ try{ const r = await api("/api/edit/status");
+    $("#edStatus", m).innerHTML = r.left ? `<b>Осталось: ${r.left}</b>${r.errors ? `, <span class="warn">с ошибкой: ${r.errors}</span>` : ""} · исправлено: ${r.done}${r.paused ? ` · <span class="warn">на паузе</span>` : ""}` : (r.done ? `<span class="ok">Исправлено: ${r.done}</span>` : "");
+    $("#edPauseBtn", m).textContent = r.paused ? "▶ Продолжить" : "⏸ Пауза";
+    const bd = $("#bEdits"); bd.textContent = r.left || ""; bd.classList.toggle("hidden", !r.left);
+  }catch(e){} }
+  editsRefresh = status; setInterval(() => { if(page === "edits") status(); }, 5000);
   async function showPrev(){
     const b = {sites: [...m.querySelectorAll("[data-es]")].filter(c => c.checked).map(c => c.dataset.es), date: $("#edDate", m).value, find: $("#edFind", m).value, replace: $("#edRepl", m).value};
     try{ prev = await post("/api/edit/preview", b); }catch(e){ return; }
@@ -1480,7 +1493,7 @@ async function editAdsModal(){
   });
   showPrev();
 }
-$("#editAds").onclick = editAdsModal;
+let editsRefresh = null;
 
 // ---------- товары перетаскиванием (без проводника) ----------
 const UP = {};   // line -> {done,total,msg,err}
