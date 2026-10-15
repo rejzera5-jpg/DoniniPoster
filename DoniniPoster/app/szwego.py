@@ -93,16 +93,20 @@ def _fetch(url, path, tries=3):
     err = None
     for k in range(tries):
         try:
-            req = urllib.request.Request(url, headers={
+            import urllib.parse as _up
+            req = urllib.request.Request(_up.quote(url, safe=":/?&=%#+,;@!$'()*~[]"), headers={
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129 Safari/537.36",
                 "Referer": "https://www.szwego.com/",
             })
             with urllib.request.urlopen(req, timeout=40) as r:
                 data = r.read()
+                total = int(r.headers.get("Content-Length") or 0)
             if len(data) < 500:
                 raise IOError("пустой файл")
+            if total and len(data) < total:
+                raise IOError("связь оборвалась — фото скачалось не до конца")
             path.write_bytes(data)
-            if truncated(path):
+            if truncated(path) and k < tries - 1 and not total:
                 raise IOError("фото скачалось не до конца")
             return
         except Exception as e:

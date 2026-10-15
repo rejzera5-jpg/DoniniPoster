@@ -82,20 +82,28 @@ def _clean(s):
     return re.sub(r"\s+", " ", s).strip(" .")
 
 
+def _safe_url(url):
+    """Адрес фото с не-латинскими буквами в имени файла (иначе ошибка «ascii codec»)."""
+    import urllib.parse as up
+    return up.quote(url, safe=":/?&=%#+,;@!$'()*~[]")
+
+
 def _fetch(url, path, tries=3):
     """Скачивает фото. Сайт иногда «подвисает» на одном фото — тогда не ждём минуту, а пробуем ещё раз."""
     err = None
     for k in range(tries):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 DoniniPoster"})
+            req = urllib.request.Request(_safe_url(url), headers={"User-Agent": "Mozilla/5.0 DoniniPoster"})
             with urllib.request.urlopen(req, timeout=15 + 10 * k) as r:
                 data = r.read()
+                total = int(r.headers.get("Content-Length") or 0)
             if len(data) < 500:
                 raise IOError("пустой файл")
+            # перекачиваем, только если связь оборвалась (пришло меньше, чем отдал сайт).
+            # Если сам файл на сайте обрезан — перекачка не поможет, берём как есть (проверка фото решит).
+            if total and len(data) < total and k < tries - 1:
+                raise IOError("связь оборвалась — фото скачалось не до конца")
             path.write_bytes(data)
-            from .photo_qc import truncated
-            if truncated(path) and k < tries - 1:
-                raise IOError("фото скачалось не до конца")
             return
         except Exception as e:
             err = e
