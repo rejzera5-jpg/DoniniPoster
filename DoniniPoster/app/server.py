@@ -1838,9 +1838,10 @@ def create_app(engine):
         out = []
         for p in engine.state["products"].values():
             for sid, st in (p.get("sites") or {}).items():
-                if sid not in sites or st.get("status") != "done" or st.get("edit"):
+                # уже поставленные в работу тоже берём — повторный запуск обновляет им новое название
+                if sid not in sites or not (st.get("status") == "done" or st.get("edit")):
                     continue
-                if day and not str(st.get("at") or "").startswith(day):
+                if day and not str((st.get("edit") or {}).get("prev_at") or st.get("at") or "").startswith(day):
                     continue
                 out.append((p, sid, st))
         out.sort(key=lambda x: str(x[2].get("at") or ""))
@@ -1852,7 +1853,10 @@ def create_app(engine):
         if find and find.lower() in t.lower():
             import re as _re
             return _re.sub(_re.escape(find), repl, t, flags=_re.I).strip()
-        brand = ad.get("brand") if (s.get("title_brand") and not p.get("no_brand")) else ""
+        # бренд остаётся в названии (как было в выставленном объявлении), если у товара он не выключен
+        brand = "" if p.get("no_brand") else (ad.get("brand") or p.get("brand") or "")
+        if brand and brand.lower() in repl.lower():
+            brand = ""
         return " ".join(x for x in (repl, brand, str(p.get("code") or "")) if x).strip()
 
     @app.post("/api/edit/preview")

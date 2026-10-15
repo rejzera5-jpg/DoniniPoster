@@ -1237,9 +1237,11 @@
             (errs.length ? ` — на странице: ${errs.join("; ")}` : ` (страница: ${location.pathname.slice(0, 40)})`));
         }
         if (st.action === "publish") {
-          await recheckBoxes(steps, i);
-          await sleep(1500);
-          await recheckBoxes(steps, i);
+          if (!(job && job.site && job.site.edit)) {  // при исправлении названия галочек нет — не ждём
+            await recheckBoxes(steps, i);
+            await sleep(1500);
+            await recheckBoxes(steps, i);
+          }
           waitPublish(el, i);
           return;
         }
@@ -1476,7 +1478,7 @@
         return;
       }
       if (!pub || pub.mode !== "auto" || sent) return;
-      for (let s = 2; s > 0 && !sent && !unloading; s--) {
+      for (let s = job && job.site && job.site.edit ? 0 : 2; s > 0 && !sent && !unloading; s--) {
         status(`🤖 Режим «без меня»: публикую через ${s} сек…`);
         await sleep(1000);
       }

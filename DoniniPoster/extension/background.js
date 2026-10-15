@@ -315,7 +315,9 @@ async function autoCheck() {
   if (a.waitFor !== a.pid) {
     const now = Date.now();
     if (a.lastEdit) {
-      a.editUntil = now + (6 + Math.round(Math.random() * 6)) * 1000;
+      // сколько заняло исправление — чтобы следующее начинать, только если успеет до товара очереди
+      if (a.startedAt) a.editDur = Math.round(((a.editDur || 18000) + (now - a.startedAt)) / 2);
+      a.editUntil = now + 2000 + Math.round(Math.random() * 2000);
     } else {
       const left = pauseSeconds(await getPub());
       a.queueUntil = left ? now + left * 1000 : 0; a.editUntil = now + 5000;
@@ -328,17 +330,23 @@ async function autoCheck() {
   let st;
   try { st = await api("/api/ext/state"); } catch (e) { return; }
   const queueWait = a.queueUntil && Date.now() < a.queueUntil;
-  // сначала товары, которые ждут ВСЕ выбранные сайты; недоделанные (уже выставлены на части сайтов) — в конце
+  // исправление начинаем, только если оно успеет закончиться до следующего товара очереди — очередь не задерживаем
+  const editFits = !queueWait || Date.now() + (a.editDur || 18000) + 2000 <= a.queueUntil;
+  const fresh = (st.products || []).filter((p) => !(a.tried || []).includes(p.id));
+  const firstEdit = fresh.find((p) => p.edit);
   let next = null, nextSites = [];
-  for (const p of st.products || []) {
-    if ((a.tried || []).includes(p.id)) continue;
-    if (p.edit) {  // исправление: сайты не зависят от выбранных для выставления
-      next = p; nextSites = p.sites.map((x) => x.id); break;
+  if (queueWait) {
+    if (firstEdit && editFits) { next = firstEdit; nextSites = firstEdit.sites.map((x) => x.id); }
+  } else {
+    // сначала товары, которые ждут ВСЕ выбранные сайты; недоделанные (уже выставлены на части сайтов) — в конце
+    for (const p of fresh) {
+      if (p.edit) continue;
+      const ids = p.sites.map((x) => x.id).filter((id) => !a.sites || !a.sites.length || a.sites.includes(id));
+      if (ids.length > nextSites.length) { next = p; nextSites = ids; }
+      if (a.sites && ids.length >= a.sites.length) break; // полный товар — берём сразу
     }
-    if (queueWait) continue;  // очередь ещё на паузе — пока только исправления
-    const ids = p.sites.map((x) => x.id).filter((id) => !a.sites || !a.sites.length || a.sites.includes(id));
-    if (ids.length > nextSites.length) { next = p; nextSites = ids; }
-    if (a.sites && ids.length >= a.sites.length) break; // полный товар — берём сразу
+    // очередь закончилась — дальше только исправления
+    if (!next && firstEdit) { next = firstEdit; nextSites = firstEdit.sites.map((x) => x.id); }
   }
   if (!next && queueWait) { scheduleAutoCheck(a.queueUntil - Date.now() + 200); return; }
   const oldTabs = cur.map(([tid]) => Number(tid));
