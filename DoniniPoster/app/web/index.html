@@ -847,7 +847,7 @@ function renderQueue(siteMode){
   const tplBar = usedLines.length ? `<div class="tplbar"><span class="small muted">Шаблон текста:</span>${usedLines.map(l => `<span class="tplitem"><b>${esc(l.name)}</b>
       <select data-linetpl="${esc(l.id)}" title="Шаблон текста для всех товаров «${esc(l.name)}»">${tplOpts(l.template)}</select>
       <button class="sm" data-mgrtpl="${esc(l.template)}" title="Открыть этот шаблон в Donini Manager и поправить текст">✏️</button></span>`).join("")}</div>` : "";
-  setHTML(box, `${tplBar}${rows.length > 300 ? `<div class="small muted" style="margin-bottom:6px">Показаны первые 300 из ${rows.length}</div>` : ""}<table><thead><tr><th style="width:26px"><input type="checkbox" data-selall="${siteMode ? 1 : 0}" ${allSel ? "checked" : ""} title="Выбрать все"></th><th></th><th>Код</th><th>Товар</th><th>Размер</th><th>Цена, зл</th><th>Сайты</th><th></th></tr></thead><tbody>${
+  setHTML(box, `${tplBar}${rows.length > 300 ? `<div class="small muted" style="margin-bottom:6px">Показаны первые 300 из ${rows.length}</div>` : ""}<table><thead><tr><th style="width:26px"><input type="checkbox" data-selall="${siteMode ? 1 : 0}" ${allSel ? "checked" : ""} title="Выбрать все. Подсказка: отметьте один товар, потом с Shift — другой: выберутся все между ними"></th><th></th><th>Код</th><th>Товар</th><th>Размер</th><th>Цена, зл</th><th>Сайты</th><th></th></tr></thead><tbody>${
     shown.map(p => {
       const chips = Object.entries(p.sites).map(([sid, st]) => {
         const name = sites[sid] ? sites[sid].name.replace(/\s*\(.*\)/, "") : sid;
@@ -865,7 +865,7 @@ function renderQueue(siteMode){
         <td style="max-width:340px"><a data-act="card" data-pid="${p.id}" style="cursor:pointer">${esc(p.name)}</a>
           <div class="small muted">${esc(lines[p.line]?.name || p.line)} · ${archived ? `🧾 ${esc(tplLabel(effTpl(p)))}` : `<select class="tplsel${p.template ? " own" : ""}" data-tpl="${p.id}" title="Шаблон текста объявления для этого товара">
               <option value="">🧾 ${esc(tplLabel(lines[p.line]?.template))} — как у «${esc(lines[p.line]?.name || "")}»</option>
-              ${(META.types || []).filter(t => t.id !== lines[p.line]?.template).map(t => `<option value="${esc(t.id)}" ${t.id === p.template ? "selected" : ""}>🧾 ${esc(t.label)}${t.custom ? " (свой)" : ""}</option>`).join("")}</select>`} · ${p.photos.length} фото${p.qc_bad && Object.keys(p.qc_bad).length ? ` · <span class="qcbadge" title="${esc(Object.entries(p.qc_bad).map(([f, r]) => f.split(/[\\/]/).pop() + ": " + r).join("\n"))}">🧹 убрано плохих фото: ${Object.keys(p.qc_bad).length}</span>` : p.photos_locked ? " · фото выбраны" : ""}${p.texts && Object.keys(p.texts).length ? ` · <span class="warn" title="Текст поправлен вручную — шаблон к нему не применяется. «↺ Тексты по шаблону» — вернуть шаблон">✏️ свой текст</span>` : ""}
+              ${(META.types || []).filter(t => t.id !== lines[p.line]?.template).map(t => `<option value="${esc(t.id)}" ${t.id === p.template ? "selected" : ""}>🧾 ${esc(t.label)}${t.custom ? " (свой)" : ""}</option>`).join("")}</select>`} · ${p.photos.length} фото${p.qc_bad && Object.keys(p.qc_bad).length ? ` · <span class="qcbadge" title="${esc(Object.entries(p.qc_bad).map(([f, r]) => f.split(/[\\/]/).pop() + ": " + r).join("\n"))}">🧹 убрано плохих фото: ${Object.keys(p.qc_bad).length}</span>` : p.photos_locked ? " · фото выбраны" : ""}${p.photos_manual ? ` · <span class="ok" title="Фото выбраны вами в карточке — автопроверка их не трогает">✋ проверено вручную</span>` : ""}${p.texts && Object.keys(p.texts).length ? ` · <span class="warn" title="Текст поправлен вручную — шаблон к нему не применяется. «↺ Тексты по шаблону» — вернуть шаблон">✏️ свой текст</span>` : ""}
             ${archived ? (p.no_brand ? " · без бренда" : "") : `<button class="sm brandtg ${p.no_brand ? "off" : "on"}" data-act="brand" data-pid="${p.id}" title="${p.no_brand ? "Этот товар — БЕЗ бренда на всех сайтах. Нажмите — включить бренд (на сайтах с 🏷)" : "С брендом на: " + (Object.keys(p.sites).filter(k => sites[k] && sites[k].title_brand && k !== "doninisklep").map(k => sites[k].name).join(", ") || "— ни на одном (включите 🏷 у сайта сверху)") + ". Нажмите — этот товар везде без бренда"}">${p.no_brand ? "🚫 без бренда" : "🏷 с брендом" + (p.brand ? ": " + esc(p.brand) : "")}</button>`}</div></td>
         <td>${archived ? esc(p.size) : `<input class="mini" data-edit="size" data-pid="${p.id}" value="${esc(p.size)}">`}</td>
         <td>${archived ? esc(p.price) : `<input class="tiny${!(+p.price > 0) ? " noprice" : ""}" data-edit="price" data-pid="${p.id}" value="${esc(p.price || "")}" ${!(+p.price > 0) ? `placeholder="цена!" title="Нет цены — без неё товар на доски не пойдёт"` : ""}>`}</td>
@@ -1842,6 +1842,8 @@ function renderBulk(siteMode, rows){
   const lineOpts = S.lines.filter(l => (l.id === "site") === siteMode).map(l => {
     const t = META.types.find(x => x.id === l.template); return `<option value="${esc(l.id)}">${esc(l.name)} (шаблон: ${esc(t ? t.label : l.template)})</option>`; }).join("");
   setHTML(box, `<div class="bulk"><b>Выбрано: ${ids.length}</b>
+    <button class="sm" data-bulk="toend" title="Отметить все товары от последнего отмеченного и до конца списка">⤓ От него до конца</button>
+    <select data-bulksel="recent" title="Отметить товары, которые недавно попали в очередь"><option value="">☑ Добавить: недавно добавленные…</option><option value="30">за 30 минут</option><option value="60">за 1 час</option><option value="180">за 3 часа</option><option value="1440">за сутки</option></select>
     <button class="sm" data-bulk="top" title="Эти товары выставятся раньше остальных">⏫ Выставить первыми</button>
     <button class="sm" data-bulk="retry">🔁 Повторить ошибки</button>
     <select data-bulksel="line"><option value="">➡ Перенести в вид товара…</option>${lineOpts}</select>
@@ -1868,10 +1870,34 @@ async function doBulk(action, value){
   if(action === "remove") SEL.clear();
   refresh();
 }
+let SEL_LAST = null, SEL_SHIFT = false;
+for(const id of ["#qSite", "#qBoards"]) $(id).addEventListener("click", e => { if(e.target.dataset && e.target.dataset.sel) SEL_SHIFT = e.shiftKey; }, true);
+// «от выбранного до конца»: все товары, что в списке ниже последнего отмеченного
+function selectToEnd(siteMode){
+  const box = siteMode ? $("#qSite") : $("#qBoards");
+  const boxes = [...box.querySelectorAll("[data-sel]")];
+  let from = boxes.findIndex(b => b.dataset.sel === SEL_LAST);
+  if(from < 0) from = Math.max(...boxes.map((b, k) => SEL.has(b.dataset.sel) ? k : -1));
+  if(from < 0) return toast("Сначала отметьте товар, с которого начать", true);
+  boxes.slice(from).forEach(b => SEL.add(b.dataset.sel));
+  toast(`Выбрано с этого товара до конца: ${boxes.length - from}`); render(true);
+}
+function selectRecent(siteMode, minutes){
+  const since = Date.now() - minutes * 60000;
+  const rows = S.products.filter(p => p.status !== "archived" && (p.line === "site") === siteMode && new Date(p.added).getTime() >= since);
+  rows.forEach(p => SEL.add(p.id)); toast(`Выбрано добавленных за ${minutes >= 60 ? (minutes / 60) + " ч" : minutes + " мин"}: ${rows.length}`); render(true);
+}
 for(const id of ["#qSite", "#qBoards", "#bulkSite", "#bulkBoards"]){
   $(id).addEventListener("change", e => {
     const c = e.target;
-    if(c.dataset.sel){ c.checked ? SEL.add(c.dataset.sel) : SEL.delete(c.dataset.sel); render(true); }
+    if(c.dataset.sel){
+      const boxes = [...c.closest("table").querySelectorAll("[data-sel]")];
+      const i = boxes.indexOf(c), j = boxes.findIndex(b => b.dataset.sel === SEL_LAST);
+      if(SEL_SHIFT && j >= 0 && i >= 0){  // Shift+клик — все товары между прошлым и этим
+        boxes.slice(Math.min(i, j), Math.max(i, j) + 1).forEach(b => c.checked ? SEL.add(b.dataset.sel) : SEL.delete(b.dataset.sel));
+      } else { c.checked ? SEL.add(c.dataset.sel) : SEL.delete(c.dataset.sel); }
+      SEL_LAST = c.dataset.sel; SEL_SHIFT = false; render(true);
+    }
     if(c.dataset.selall !== undefined){
       const siteMode = c.dataset.selall === "1";
       const lineF = siteMode ? "" : $("#qLineFilter").value, stF = siteMode ? "" : $("#qStateFilter").value;
@@ -1880,9 +1906,10 @@ for(const id of ["#qSite", "#qBoards", "#bulkSite", "#bulkBoards"]){
       render(true);
     }
     if(c.dataset.bulksel === "line" && c.value){ const v = c.value; c.value = ""; doBulk("line", v); }
+    if(c.dataset.bulksel === "recent" && c.value){ const v = +c.value; c.value = ""; selectRecent(id === "#bulkSite", v); }
     if(c.dataset.bulksel === "template" && c.value){ const v = c.value === "__line" ? "" : c.value; c.value = ""; doBulk("template", v); }
   });
-  $(id).addEventListener("click", e => { const b = e.target.closest("[data-bulk]"); if(b) doBulk(b.dataset.bulk); });
+  $(id).addEventListener("click", e => { const b = e.target.closest("[data-bulk]"); if(!b) return; if(b.dataset.bulk === "toend") return selectToEnd(id === "#bulkSite"); doBulk(b.dataset.bulk); });
 }
 
 // ---------- карточка товара ----------

@@ -192,7 +192,7 @@ def loop(engine):
             todo = [] if level == "off" else [p for p in list(engine.state["products"].values())
                                                if p.get("status") != "archived" and not p.get("qc_done")]
             for p in todo[:20]:
-                if p.get("photos_locked"):  # фото вы выбрали сами — не трогаем
+                if p.get("photos_locked") or p.get("photos_manual"):  # фото вы выбрали сами — не трогаем
                     p["qc_done"] = True
                     continue
                 bad = run_for_product(p, level)
@@ -220,7 +220,7 @@ def restore_wrong(engine):
         bad = p.get("qc_bad") or {}
         if p.get("status") == "archived" or p.get("qc_ver") == QC_VER or not p.get("qc_done"):
             continue
-        if p.get("photos_locked") and not bad:
+        if p.get("photos_manual") or (p.get("photos_locked") and not bad):
             continue  # фото выбраны вручную в карточке — не трогаем
         f = Path(p.get("folder") or "")
         allp = queue_store.list_photos(f) if f.is_dir() else [x for x in p.get("kept") or [] if Path(x).exists()]

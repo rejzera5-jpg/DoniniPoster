@@ -969,6 +969,7 @@ def create_app(engine):
             if sel:
                 p["photos"] = sel
                 p["photos_locked"] = True
+                p["photos_manual"] = True  # проверено вручную — автопроверка этот товар больше не трогает
                 p.pop("qc_allbad", None)
                 for st in (p.get("sites") or {}).values():
                     if st.get("status") == "error" and st.get("error") == ALL_BAD:
@@ -978,6 +979,7 @@ def create_app(engine):
                 shutil.rmtree(C.PREPARED_DIR / pid, ignore_errors=True)
         if data.get("photos_reset"):
             p.pop("photos_locked", None)
+            p.pop("photos_manual", None)
             p["photos"] = _card_photos(p) or p.get("photos") or []
         if "skip_sites" in data:  # галочки сайтов в карточке: снятый сайт — «пропуск» для этого товара
             for sid, on in (data.get("skip_sites") or {}).items():
@@ -1153,12 +1155,13 @@ def create_app(engine):
         for p in engine.state["products"].values():
             if p["status"] == "archived" or (ids and p["id"] not in ids):
                 continue
-            if p.get("photos_locked") and not p.get("qc_bad") and not ids:
+            if (p.get("photos_manual") or (p.get("photos_locked") and not p.get("qc_bad"))) and not ids:
                 continue  # фото выбраны вручную — без явного выбора не трогаем
             allp = _card_photos(p)
             if allp:
                 p["photos"] = allp
             p.pop("photos_locked", None)
+            p.pop("photos_manual", None)
             p.pop("qc_done", None)
             p.pop("qc_bad", None)
             p.pop("qc_allbad", None)
