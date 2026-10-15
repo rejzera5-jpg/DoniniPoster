@@ -310,36 +310,49 @@ async function autoCheck() {
   if (cur.some(([, j]) => !FINISHED.includes(j.status))) return; // ещё не всё сделано
   // пауза между товарами (чтобы сайты не считали это роботом)
   // пауза между товарами: отсчитывается после того, как товар выставлен на всех сайтах
+  // пауза между товарами очереди: отсчитывается после товара. Исправления объявлений идут В ЭТУ паузу
+  // (у них своя короткая пауза), так очередь не замедляется, а исправления не ждут минуту.
   if (a.waitFor !== a.pid) {
-    const sec = pauseSeconds(await getPub());
-    const spent = a.startedAt ? Math.round((Date.now() - a.startedAt) / 1000) : 0;
-    const left = sec; // полная пауза ПОСЛЕ товара (как задано в настройке «интервал»)
-    a.waitFor = a.pid; a.waitUntil = left ? Date.now() + left * 1000 : 0; await setAuto(a);
-    if (left) log(`⏳ Пауза ${fmtPause(left)} перед следующим товаром`);
+    const now = Date.now();
+    if (a.lastEdit) {
+      a.editUntil = now + (6 + Math.round(Math.random() * 6)) * 1000;
+    } else {
+      const left = pauseSeconds(await getPub());
+      a.queueUntil = left ? now + left * 1000 : 0; a.editUntil = now + 5000;
+      if (left) log(`⏳ Пауза ${fmtPause(left)} перед следующим товаром`);
+    }
+    a.waitFor = a.pid; a.waitUntil = a.queueUntil || 0; await setAuto(a);
   }
-  if (a.waitUntil && Date.now() < a.waitUntil) { scheduleAutoCheck(a.waitUntil - Date.now() + 200); return; }
+  if (a.editUntil && Date.now() < a.editUntil) { scheduleAutoCheck(a.editUntil - Date.now() + 200); return; }
   // следующий товар: первый в очереди, который в этом заходе ещё не открывали
   let st;
   try { st = await api("/api/ext/state"); } catch (e) { return; }
+  const queueWait = a.queueUntil && Date.now() < a.queueUntil;
   // сначала товары, которые ждут ВСЕ выбранные сайты; недоделанные (уже выставлены на части сайтов) — в конце
   let next = null, nextSites = [];
   for (const p of st.products || []) {
     if ((a.tried || []).includes(p.id)) continue;
+    if (p.edit) {  // исправление: сайты не зависят от выбранных для выставления
+      next = p; nextSites = p.sites.map((x) => x.id); break;
+    }
+    if (queueWait) continue;  // очередь ещё на паузе — пока только исправления
     const ids = p.sites.map((x) => x.id).filter((id) => !a.sites || !a.sites.length || a.sites.includes(id));
     if (ids.length > nextSites.length) { next = p; nextSites = ids; }
     if (a.sites && ids.length >= a.sites.length) break; // полный товар — берём сразу
   }
+  if (!next && queueWait) { scheduleAutoCheck(a.queueUntil - Date.now() + 200); return; }
   const oldTabs = cur.map(([tid]) => Number(tid));
   if (!next) {
     await autoStop("очередь закончилась");
     return;
   }
   // сайты, где этот товар уже выставлен раньше, не открываем повторно (иначе будут дубли объявлений)
-  const already = (a.sites || []).filter((id) => !nextSites.includes(id));
+  const already = next.edit ? [] : (a.sites || []).filter((id) => !nextSites.includes(id));
   if (already.length) {
     const nm = (id) => ((st.sites || []).find((x) => x.id === id) || {}).name || id;
     log(`ℹ️ Товар ${next.code} уже выставлен на: ${already.map(nm).join(", ")} — открываю только оставшиеся сайты (${nextSites.length})`);
   }
+  a.lastEdit = !!next.edit;
   a.pid = next.id; a.tried = [...(a.tried || []), next.id].slice(-500); a.count = (a.count || 0) + 1;
   a.startedAt = Date.now();
   await setAuto(a);
