@@ -56,14 +56,26 @@ def _blank_tail(im):
     return worst
 
 
+QC_VER = 2
+
+
 def check_one(path):
     """{ok, reason, sharp} для одного фото."""
     try:
         im = _open(path)
     except Exception as e:
-        msg = str(e).lower()
-        return {"ok": False, "reason": "фото обрезано (скачалось не до конца)" if "truncat" in msg else "фото битое — не открывается",
-                "sharp": 0}
+        if "truncat" not in str(e).lower():
+            return {"ok": False, "reason": "фото битое — не открывается", "sharp": 0}
+        # «не хватает конца файла» бывает и у нормальных фото (с сайтов, из WeChat) — браузер их показывает целиком.
+        # Плохим считаем, только если реально видно пустую/серую часть картинки (проверка ниже).
+        try:
+            ImageFile.LOAD_TRUNCATED_IMAGES = True
+            im = Image.open(path)
+            im.load()
+        except Exception:
+            return {"ok": False, "reason": "фото битое — не открывается", "sharp": 0}
+        finally:
+            ImageFile.LOAD_TRUNCATED_IMAGES = False
     try:
         if min(im.size) < MIN_SIDE:
             return {"ok": False, "reason": f"слишком маленькое ({im.size[0]}×{im.size[1]})", "sharp": 0}
@@ -132,6 +144,12 @@ def loop(engine):
     while True:
         try:
             level = engine.cfg.get("photo_qc") or "normal"
+            if not getattr(engine, "_qc_fixed", False):
+                engine._qc_fixed = True
+                n = restore_wrong(engine)
+                if n:
+                    engine.log(f"♻️ Вернул фото, ошибочно убранные проверкой («фото обрезано»): товаров {n} — проверяю их заново")
+                    engine.save()
             todo = [] if level == "off" else [p for p in list(engine.state["products"].values())
                                                if p.get("status") != "archived" and not p.get("qc_done")]
             for p in todo[:20]:
@@ -155,6 +173,25 @@ def loop(engine):
         time.sleep(4)
 
 
+def restore_wrong(engine):
+    """Версия 4.3.0 ошибочно убирала нормальные фото как «обрезанные» — возвращаем все фото и проверяем заново."""
+    from . import queue_store
+    n = 0
+    for p in engine.state["products"].values():
+        bad = p.get("qc_bad") or {}
+        if p.get("qc_ver") == QC_VER or not any("обрезано" in str(v) for v in bad.values()):
+            continue
+        f = Path(p.get("folder") or "")
+        allp = queue_store.list_photos(f) if f.is_dir() else [x for x in p.get("kept") or [] if Path(x).exists()]
+        if allp:
+            p["photos"] = allp
+        p.pop("photos_locked", None)
+        p.pop("qc_bad", None)
+        p.pop("qc_done", None)
+        n += 1
+    return n
+
+
 def run_for_product(p, level="normal"):
     """Проверяет фото товара в очереди. Плохие убираются из объявления (файлы остаются в папке,
     в карточке товара их видно с причиной — можно вернуть). Возвращает {путь: причина}."""
@@ -164,6 +201,7 @@ def run_for_product(p, level="normal"):
         return {}
     bad = check_product(photos, level)
     p["qc_done"] = True
+    p["qc_ver"] = QC_VER
     p["qc_bad"] = bad
     if bad:
         p["photos"] = [x for x in photos if x not in bad]
