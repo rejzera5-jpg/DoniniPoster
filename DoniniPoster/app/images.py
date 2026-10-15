@@ -34,6 +34,7 @@ def _open(src):
 
 
 def prepare(product, max_side=1600, limit=None):
+    ImageFile.LOAD_TRUNCATED_IMAGES = True  # фото без конца файла (с сайтов, WeChat) — открываем
     out_dir = C.PREPARED_DIR / product["id"]
     out_dir.mkdir(parents=True, exist_ok=True)
     result = []
@@ -101,6 +102,7 @@ _THUMBS = {}
 
 def thumbnail(src, size=160):
     """Миниатюра в памяти (без записи на диск — антивирус не мешает)."""
+    ImageFile.LOAD_TRUNCATED_IMAGES = True  # фото без конца файла (с сайтов, WeChat) — открываем
     import io
     key = (str(src), size)
     if key not in _THUMBS:

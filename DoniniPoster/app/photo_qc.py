@@ -11,6 +11,8 @@ from pathlib import Path
 
 from PIL import Image, ImageFile, ImageFilter, ImageStat
 
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+
 MIN_SIDE = 400
 # во сколько раз резкость ниже средней по товару, чтобы считать фото замыленным (меньше — строже)
 # замыленное: чёткость ниже ABS — всегда; ниже REL от средней по товару и ниже REL_MAX — тоже
@@ -20,9 +22,10 @@ BLUR_REL_MAX = {"soft": 45, "normal": 55, "strict": 65}
 
 
 def _open(path):
-    ImageFile.LOAD_TRUNCATED_IMAGES = False
+    # общую настройку Pillow НЕ трогаем (её используют миниатюры и подготовка фото в других потоках):
+    # фото без конца файла открываются, а недокачанные ловятся по пустой/серой части картинки
     im = Image.open(path)
-    im.load()  # обрезанный при скачивании файл здесь падает: «image file is truncated»
+    im.load()
     return im
 
 
@@ -75,19 +78,8 @@ def check_one(path):
     """{ok, reason, sharp} для одного фото."""
     try:
         im = _open(path)
-    except Exception as e:
-        if "truncat" not in str(e).lower():
-            return {"ok": False, "reason": "фото битое — не открывается", "sharp": 0}
-        # «не хватает конца файла» бывает и у нормальных фото (с сайтов, из WeChat) — браузер их показывает целиком.
-        # Плохим считаем, только если реально видно пустую/серую часть картинки (проверка ниже).
-        try:
-            ImageFile.LOAD_TRUNCATED_IMAGES = True
-            im = Image.open(path)
-            im.load()
-        except Exception:
-            return {"ok": False, "reason": "фото битое — не открывается", "sharp": 0}
-        finally:
-            ImageFile.LOAD_TRUNCATED_IMAGES = False
+    except Exception:
+        return {"ok": False, "reason": "фото битое — не открывается", "sharp": 0}
     try:
         if min(im.size) < MIN_SIDE:
             return {"ok": False, "reason": f"слишком маленькое ({im.size[0]}×{im.size[1]})", "sharp": 0}
