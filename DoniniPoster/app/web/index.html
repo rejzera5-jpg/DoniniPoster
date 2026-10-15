@@ -340,10 +340,10 @@
       <label class="field">Бренд<select id="catBrand"><option value="">все бренды</option></select></label>
       <label class="field" style="flex:1;min-width:160px">Поиск<input id="catSearch" placeholder="название, модель, артикул…"></label>
       <label class="field">Кладу в очередь<select id="pullLine"></select></label>
-      <label class="switch small" style="align-self:flex-end;margin-bottom:6px"><input type="checkbox" id="catHide"> скрыть уже скачанные</label>
+      <label class="switch small" style="align-self:flex-end;margin-bottom:6px"><input type="checkbox" id="catHide"> скрыть те, что уже в очереди</label>
     </div>
     <div class="row">
-      <span class="small muted" style="flex:1">Нажмите на товар — он скачается в очередь (можно нажимать подряд). ✓ — уже скачан раньше.</span>
+      <span class="small muted" style="flex:1">Нажмите на товар — он скачается в очередь (можно нажимать подряд). «✓ в очереди» — товар сейчас лежит в очереди.</span>
       <button class="sm" id="catReload" title="Подтянуть новые товары с сайта (делается само при открытии раздела и раз в 2 минуты)">⟳ Обновить с сайта</button>
       <button class="sm" id="catAll" title="Только товары, которые сейчас видны на странице">⬇ Все на странице</button>
       <button class="sm go" id="catAllF" title="Все товары сайта с выбранной категорией, брендом и поиском — со всех страниц">⬇ Скачать все по фильтру</button>
@@ -1587,9 +1587,9 @@ function toast(text, err){
 }
 function catRender(){
   const hide = $("#catHide").checked;
-  const list = CAT.items.filter(p => !(hide && p.pulled));
-  $("#catGrid").innerHTML = list.length ? list.map(p => `<div class="ptile${p.pulled ? " done" : ""}" data-pid="${p.id}" title="${esc(p.name)}">
-      ${CAT_DONE[p.id] ? `<span class="bdg ok">✓ в очереди</span>` : p.pulled ? `<span class="bdg ok">✓ скачан</span>` : p.in_queue ? `<span class="bdg">в очереди</span>` : ""}
+  const list = CAT.items.filter(p => !(hide && p.in_queue));
+  $("#catGrid").innerHTML = list.length ? list.map(p => `<div class="ptile${p.in_queue ? " done" : ""}" data-pid="${p.id}" title="${esc(p.name)}">
+      ${CAT_DONE[p.id] || p.in_queue ? `<span class="bdg ok">✓ в очереди</span>` : ""}
       <img loading="lazy" src="${esc(p.img)}" alt="">
       ${CAT.running.has(p.id) ? `<div class="ov"><div class="spin"></div>Скачиваю…</div>` :
         CAT_DONE[p.id] && Date.now() - CAT_DONE[p.id].t < 4000 ? `<div class="ov ok">✓ Добавлено<br>в «${esc(CAT_DONE[p.id].line)}»</div>` :
@@ -1611,7 +1611,7 @@ $("#catGrid").addEventListener("click", e => {
   const t = e.target.closest(".ptile"); if(!t) return;
   const p = CAT.items.find(x => String(x.id) === t.dataset.pid);
   if(!p) return;
-  if(p.pulled && !confirm("Этот товар уже скачивали. Скачать ещё раз?")) return;
+  if(p.in_queue && !confirm("Этот товар уже лежит в очереди. Скачать ещё раз (будет вторая копия)?")) return;
   catPull([p.id]);
 });
 // все товары по фильтру (например все сумки Gucci) — со всех страниц каталога, одной кнопкой
@@ -1631,14 +1631,14 @@ $("#catAllF").onclick = async () => {
   const name = catFilterName();
   if(!r.total) return alert(`${name}: товаров с фото нет.`);
   if(!r.new.length){
-    if(!confirm(`${name}: все ${r.total} товаров уже скачаны в очередь раньше.\n\nСкачать их ещё раз?`)) return;
+    if(!confirm(`${name}: все ${r.total} товаров уже лежат в очереди.\n\nСкачать их ещё раз (будут вторые копии)?`)) return;
     return catPull(r.ids);
   }
   const skip = r.total - r.new.length;
-  if(!confirm(`${name}: ${r.total} товаров на сайте${skip ? `, из них ${skip} уже скачаны раньше — их пропущу` : ""}.\n\nСкачать в очередь ${r.new.length} товаров?`)) return;
+  if(!confirm(`${name}: ${r.total} товаров на сайте${skip ? `, из них ${skip} уже в очереди — их пропущу` : ""}.\n\nСкачать в очередь ${r.new.length} товаров?`)) return;
   catPull(r.new);
 };
-$("#catAll").onclick = () => { const ids = CAT.items.filter(p => !p.pulled).map(p => p.id); if(!ids.length) return alert("На странице всё уже скачано."); if(confirm(`Скачать в очередь ${ids.length} товаров?`)) catPull(ids); };
+$("#catAll").onclick = () => { const ids = CAT.items.filter(p => !p.in_queue).map(p => p.id); if(!ids.length) return alert("Все товары на странице уже в очереди."); if(confirm(`Скачать в очередь ${ids.length} товаров?`)) catPull(ids); };
 $("#catMore").onclick = () => { CAT.page++; catLoad(false); };
 $("#catReload").onclick = () => catRefresh(true);
 $("#catBrand").onchange = () => { try{ localStorage.setItem("catBrand", $("#catBrand").value); }catch(e){} catLoad(true); };
@@ -1656,7 +1656,7 @@ async function pullStatus(){
   for(const [id, line] of Object.entries(st.done_ids || {})){
     const k = Number(id);
     if(CAT.running.has(k)){ CAT.running.delete(k); CAT_DONE[k] = {line, t: Date.now()}; changed = true; toast(`✓ Добавлено в очередь «${line}»`);
-      const it = CAT.items.find(x => x.id === k); if(it) it.pulled = true; }
+      const it = CAT.items.find(x => x.id === k); if(it){ it.pulled = true; it.in_queue = true; } }
   }
   for(const id of st.failed_ids || []){ const k = Number(id); if(CAT.running.has(k)){ CAT.running.delete(k); CAT_FAIL[k] = 1; changed = true; toast("⚠️ Товар не скачался — сайт не ответил. Нажмите ещё раз.", true); } }
   const pr = $("#catProg");

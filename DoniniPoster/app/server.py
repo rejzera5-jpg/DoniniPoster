@@ -237,6 +237,15 @@ def create_app(engine):
         except Exception as e:
             raise HTTPException(400, f"Сайт не подключён: {e}")
 
+    def _in_queue_woo():
+        """Товары сайта, которые СЕЙЧАС лежат в очереди (не «когда-то скачивали»): по папке скачивания и по коду."""
+        from . import sources
+        queued = [p for p in engine.state["products"].values() if p.get("status") != "archived"]
+        folders = {Path(p.get("folder") or "").name for p in queued}
+        codes = {str(p.get("code")) for p in queued}
+        ids = {wid for wid, folder in sources._seen().items() if folder in folders}
+        return ids, codes
+
     @app.get("/api/woo/catalog_ids")
     async def woo_catalog_ids(category: str = "", brand: str = "", search: str = ""):
         """Все товары сайта по фильтру (категория + бренд + поиск) — для кнопки «Скачать все»."""
@@ -247,7 +256,7 @@ def create_app(engine):
             raise HTTPException(400, f"Сайт не подключён: {e}")
 
         def get():
-            params = {"status": "publish", "orderby": "date", "order": "desc", "per_page": 100, "_fields": "id,images"}
+            params = {"status": "publish", "orderby": "date", "order": "desc", "per_page": 100, "_fields": "id,images,sku"}
             if category:
                 params["category"] = category
             if search:
@@ -268,9 +277,11 @@ def create_app(engine):
             prods = await asyncio.to_thread(get)
         except Exception as e:
             raise HTTPException(400, f"Сайт doninisklep.com сейчас не отвечает — подождите минуту ({str(e)[:80]})")
-        pulled = sources.pulled_ids()
-        ids = [p["id"] for p in prods if p.get("images")]
-        return {"total": len(ids), "ids": ids, "new": [i for i in ids if str(i) not in pulled]}
+        inq, codes = _in_queue_woo()
+        prods = [p for p in prods if p.get("images")]
+        ids = [p["id"] for p in prods]
+        new = [p["id"] for p in prods if str(p["id"]) not in inq and str(p.get("sku") or "-") not in codes]
+        return {"total": len(ids), "ids": ids, "new": new}
 
     @app.get("/api/woo/catalog")
     async def woo_catalog(category: str = "", brand: str = "", search: str = "", page: int = 1):
@@ -298,9 +309,7 @@ def create_app(engine):
             prods = await asyncio.to_thread(get)
         except Exception as e:
             raise HTTPException(400, f"Сайт doninisklep.com сейчас не отвечает — подождите минуту и обновите ({str(e)[:80]})")
-        pulled = sources.pulled_ids()
-        # что уже лежит в очереди (по коду = артикулу)
-        in_queue = {str(p.get("code")) for p in engine.state["products"].values() if p.get("status") != "archived"}
+        inq, in_queue = _in_queue_woo()  # что СЕЙЧАС лежит в очереди (по папке скачивания и по коду = артикулу)
         out = []
         for p in prods:
             b, size = sources.product_info(p, w)
@@ -308,7 +317,8 @@ def create_app(engine):
             out.append({"id": p["id"], "name": p.get("name"), "brand": b, "size": size, "sku": p.get("sku") or "",
                         "price": p.get("regular_price") or p.get("price") or "", "photos": len(imgs),
                         "img": imgs[0].get("src") if imgs else "", "url": p.get("permalink"),
-                        "pulled": str(p["id"]) in pulled, "in_queue": str(p.get("sku") or "-") in in_queue})
+                        "pulled": str(p["id"]) in inq or str(p.get("sku") or "-") in in_queue,
+                        "in_queue": str(p["id"]) in inq or str(p.get("sku") or "-") in in_queue})
         return {"products": out, "more": len(prods) >= 40}
 
     # категория товара на сайте → вид товара в программе (с нужным шаблоном текста); нет такого — создаём
