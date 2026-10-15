@@ -167,7 +167,7 @@ class Engine:
             s = p["sites"].get(site["id"])
             if s and s["status"] == "pending" and (site.get("type") == "plugin" or self.scenario_for(site, p["line"])):
                 from . import photo_qc
-                if photo_qc.pending(p, self.cfg):
+                if photo_qc.pending(p, self.cfg) or (p.get("qc_allbad") and (self.cfg.get("photo_qc") or "normal") != "off"):
                     continue
                 cands.append(p)
         cands.sort(key=lambda p: p["added"])

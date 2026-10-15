@@ -17,6 +17,7 @@ from .templates import (ALL_LANGS, LANG_NAMES, build_texts, convert_price, decod
 WEB = Path(__file__).parent / "web"
 
 
+ALL_BAD = "Все фото недокачанные (файлы обрезаны — размытые/пустые). Скачайте фото этого товара заново или выберите фото в карточке 🗂"
 NO_PRICE = "Нет цены — впишите цену в очереди (без цены OLX и другие доски не дают выставить)"
 
 
@@ -958,6 +959,10 @@ def create_app(engine):
             if sel:
                 p["photos"] = sel
                 p["photos_locked"] = True
+                p.pop("qc_allbad", None)
+                for st in (p.get("sites") or {}).values():
+                    if st.get("status") == "error" and st.get("error") == ALL_BAD:
+                        st.update(status="pending", error=None)
                 if p.get("qc_bad"):  # вернули фото, убранное проверкой, — больше не считаем его плохим
                     p["qc_bad"] = {k: v for k, v in p["qc_bad"].items() if k not in sel}
                 shutil.rmtree(C.PREPARED_DIR / pid, ignore_errors=True)
@@ -1146,6 +1151,10 @@ def create_app(engine):
             p.pop("photos_locked", None)
             p.pop("qc_done", None)
             p.pop("qc_bad", None)
+            p.pop("qc_allbad", None)
+            for st in (p.get("sites") or {}).values():
+                if st.get("status") == "error" and st.get("error") == ALL_BAD:
+                    st.update(status="pending", error=None)
             shutil.rmtree(C.PREPARED_DIR / p["id"], ignore_errors=True)
             n += 1
         engine.save()
@@ -1703,6 +1712,13 @@ def create_app(engine):
             from . import photo_qc
             if photo_qc.pending(p, engine.cfg):  # фото ещё проверяются — через пару секунд
                 continue
+            if p.get("qc_allbad") and (engine.cfg.get("photo_qc") or "normal") != "off":
+                for sid in pend:
+                    st = p["sites"][sid]
+                    if st.get("error") != ALL_BAD:
+                        st.update(status="error", error=ALL_BAD)
+                        noprice.append(p.get("code"))
+                continue
             if not float(p.get("price") or 0) > 0:
                 # без цены доски не дают выставить (OLX прячет доставку) — не открываем, сразу видно, что не так
                 for sid in pend:
@@ -1719,7 +1735,7 @@ def create_app(engine):
         if noprice:
             engine.save()
             codes = sorted(set(noprice))
-            engine.log(f"⚠️ Нет цены у товаров {', '.join(codes[:10])}{' …' if len(codes) > 10 else ''} — на доски не пойдут, пока не впишете цену")
+            engine.log(f"⚠️ Не выставляются (нет цены или все фото недокачанные): {', '.join(codes[:10])}{' …' if len(codes) > 10 else ''} — причина видна у товара в очереди")
         in_lines = {sid for l in engine.cfg["lines"] for sid in l.get("sites", [])}
         missing = [s["name"] for s in sites if s["id"] not in in_lines]
         disabled = [s["name"] for s in C.load_sites() if s.get("type") in ("ext", "manual") and not s.get("enabled")]

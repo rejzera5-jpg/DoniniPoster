@@ -2,7 +2,8 @@
 
 Плохое фото:
   • битое / не открывается / обрезано при скачивании (часть картинки серая или пустая);
-  • замыленное — резкость сильно ниже, чем у остальных фото этого же товара;
+  • недокачанное — файл обрезан (главная причина «замыленных» фото с сайта и WeChat);
+  • не в фокусе — по-настоящему размытый снимок;
   • слишком маленькое (меньше 400 px по короткой стороне).
 Проверка идёт прямо в программе, без интернета. Фото не удаляются — просто не используются в объявлении
 (в карточке товара их видно и можно вернуть)."""
@@ -16,9 +17,9 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 MIN_SIDE = 400
 # во сколько раз резкость ниже средней по товару, чтобы считать фото замыленным (меньше — строже)
 # замыленное: чёткость ниже ABS — всегда; ниже REL от средней по товару и ниже REL_MAX — тоже
-BLUR_ABS = {"soft": 24, "normal": 32, "strict": 38}
-BLUR_REL = {"soft": 0.4, "normal": 0.5, "strict": 0.6}
-BLUR_REL_MAX = {"soft": 45, "normal": 55, "strict": 65}
+# Замер на 3853 фото сайта (Louis Vuitton): у целых фото чёткость почти всегда 20 и выше,
+# по-настоящему «не в фокусе» — 8–15. Порог ниже этого, чтобы не трогать мягкие снимки деталей.
+BLUR_ABS = {"soft": 12, "normal": 16, "strict": 20}
 
 
 def _open(path):
@@ -71,11 +72,32 @@ def _blank_tail(im):
     return worst
 
 
-QC_VER = 3
+QC_VER = 4
+
+
+def truncated(path):
+    """Файл скачан не до конца. Главная причина «замыленных» фото: у прогрессивного JPEG без конца файла
+    картинка остаётся размытой (или пустой). Признак точный — у целого JPEG в конце всегда есть метка FF D9."""
+    try:
+        with open(path, "rb") as f:
+            head = f.read(4)
+            f.seek(0, 2)
+            size = f.tell()
+            f.seek(max(0, size - 4096))
+            tail = f.read()
+    except OSError:
+        return False
+    if head[:2] == b"\xff\xd8":
+        return b"\xff\xd9" not in tail
+    if head == b"\x89PNG":
+        return b"IEND" not in tail
+    return False
 
 
 def check_one(path):
     """{ok, reason, sharp} для одного фото."""
+    if truncated(path):
+        return {"ok": False, "reason": "недокачанное фото — файл обрезан, поэтому размытое или пустое", "sharp": 0, "trunc": True}
     try:
         im = _open(path)
     except Exception:
@@ -114,18 +136,16 @@ def check_product(paths, level="normal"):
     res = {p: check_one(p) for p in paths}
     good = [p for p, r in res.items() if r["ok"]]
     bad = {p: r["reason"] for p, r in res.items() if not r["ok"]}
-    vals = sorted(res[p]["sharp"] for p in good)
-    med = vals[len(vals) // 2] if vals else 0
     for p in good:
         sh = res[p]["sharp"]
-        if sh < BLUR_ABS.get(level, 32):
-            bad[p] = f"замыленное (чёткость {sh})"
-        elif len(good) >= 3 and sh < med * BLUR_REL.get(level, 0.5) and sh < BLUR_REL_MAX.get(level, 55):
-            bad[p] = f"замыленное — мягче остальных фото (чёткость {sh}, у остальных ~{med})"
+        if sh < BLUR_ABS.get(level, 16):
+            bad[p] = f"не в фокусе — размытое (чёткость {sh})"
     if len(bad) >= len(paths) and paths:
-        # всё «плохое» — оставляем лучшее, чтобы товар не остался без фото
-        best = max(paths, key=lambda p: res[p]["sharp"])
-        bad.pop(best, None)
+        # всё «плохое»: если есть хоть одно целое фото — оставляем лучшее из целых; недокачанные не оставляем
+        whole = [p for p in paths if res[p]["ok"]]  # открывается целиком (пусть и мягкое)
+        if whole:
+            best = max(whole, key=lambda p: res[p]["sharp"])
+            bad.pop(best, None)
     return {**dup, **bad}
 
 
@@ -193,6 +213,7 @@ def restore_wrong(engine):
         p.pop("photos_locked", None)
         p.pop("qc_bad", None)
         p.pop("qc_done", None)
+        p.pop("qc_allbad", None)
         n += 1
     return n
 
@@ -207,8 +228,9 @@ def run_for_product(p, level="normal"):
     bad = check_product(photos, level)
     p["qc_done"] = True
     p["qc_ver"] = QC_VER
+    p["qc_allbad"] = len(bad) >= len(photos)
     p["qc_bad"] = bad
-    if bad:
+    if bad and not p["qc_allbad"]:
         p["photos"] = [x for x in photos if x not in bad]
         p["photos_locked"] = True
     return bad

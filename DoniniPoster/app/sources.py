@@ -93,6 +93,9 @@ def _fetch(url, path, tries=3):
             if len(data) < 500:
                 raise IOError("пустой файл")
             path.write_bytes(data)
+            from .photo_qc import truncated
+            if truncated(path) and k < tries - 1:
+                raise IOError("фото скачалось не до конца")
             return
         except Exception as e:
             err = e

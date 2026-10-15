@@ -86,16 +86,29 @@ def target_dir(cfg, line, dest, shop=""):
     return C.ROOT / DOWNLOAD_DIR / line["folder"]
 
 
-def _fetch(url, path):
-    req = urllib.request.Request(url, headers={
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129 Safari/537.36",
-        "Referer": "https://www.szwego.com/",
-    })
-    with urllib.request.urlopen(req, timeout=40) as r:
-        data = r.read()
-    if len(data) < 500:
-        raise IOError("пустой файл")
-    path.write_bytes(data)
+def _fetch(url, path, tries=3):
+    """Скачивает фото и проверяет, что файл целый (недокачанное фото потом выглядит размытым/пустым)."""
+    import time as _t
+    from .photo_qc import truncated
+    err = None
+    for k in range(tries):
+        try:
+            req = urllib.request.Request(url, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129 Safari/537.36",
+                "Referer": "https://www.szwego.com/",
+            })
+            with urllib.request.urlopen(req, timeout=40) as r:
+                data = r.read()
+            if len(data) < 500:
+                raise IOError("пустой файл")
+            path.write_bytes(data)
+            if truncated(path):
+                raise IOError("фото скачалось не до конца")
+            return
+        except Exception as e:
+            err = e
+            _t.sleep(1 + k)
+    raise err
 
 
 def download_item(cfg, line, dest, shop, item, only_new=True, need_size=True, log=print):
@@ -129,8 +142,12 @@ def download_item(cfg, line, dest, shop, item, only_new=True, need_size=True, lo
         i, url = args
         try:
             _fetch(url, tmp / f"{i:02d}.jpg")
-        except Exception as e:  # одно фото не скачалось — остальные оставляем
+        except Exception as e:  # одно фото не скачалось — остальные оставляем (недокачанный файл убираем)
             errors.append(f"{i}: {e}")
+            try:
+                (tmp / f"{i:02d}.jpg").unlink()
+            except OSError:
+                pass
 
     with ThreadPoolExecutor(max_workers=10) as ex:
         list(ex.map(one, enumerate(imgs, 1)))
