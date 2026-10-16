@@ -1721,6 +1721,14 @@ def create_app(engine):
             edit_only = p["status"] == "archived"
             if edit_only and (engine.cfg.get("edit_paused") or not any(st.get("edit") for st in p["sites"].values())):
                 continue
+            for sid, st in p["sites"].items():
+                # нет номера объявления — бот не сможет его открыть; не тратим попытки, оставляем на ручное исправление
+                if st.get("edit") and sid in all_ids and "{ad_id}" in (all_ids[sid].get("edit_url") or "") and not _ad_id(st):
+                    st.pop("edit", None)
+                    st["status"] = "done"
+                    st["edit_manual"] = True
+                    engine.log(f"✏️ {all_ids[sid]['name']}: {p.get('code')} — нет номера объявления, исправьте название вручную на сайте")
+                    noprice.append(None)
             pend = [sid for sid, st in p["sites"].items() if st.get("status") in ("pending", "error")
                     and ((st.get("edit") and sid in all_ids and not engine.cfg.get("edit_paused"))  # исправления — и на выключенном сайте
                          or (not st.get("edit") and not edit_only and sid in ids))]
@@ -1767,6 +1775,8 @@ def create_app(engine):
                 prods.append(e.pop(0))
         if noprice:
             engine.save()
+            noprice = [x for x in noprice if x]
+        if noprice:
             codes = sorted(set(noprice))
             engine.log(f"⚠️ Не выставляются (нет цены или все фото недокачанные): {', '.join(codes[:10])}{' …' if len(codes) > 10 else ''} — причина видна у товара в очереди")
         in_lines = {sid for l in engine.cfg["lines"] for sid in l.get("sites", [])}
@@ -1916,12 +1926,15 @@ def create_app(engine):
     @app.get("/api/edit/status")
     async def edit_status():
         left = err = 0
+        manual = []
         for p in engine.state["products"].values():
-            for st in (p.get("sites") or {}).values():
+            for sid, st in (p.get("sites") or {}).items():
+                if st.get("edit_manual"):
+                    manual.append(f"{p.get('code')} ({sid})")
                 if st.get("edit"):
                     left += 1
                     err += st.get("status") == "error"
-        return {"left": left, "errors": err, "done": getattr(engine, "edit_done", 0), "paused": bool(engine.cfg.get("edit_paused"))}
+        return {"left": left, "errors": err, "done": getattr(engine, "edit_done", 0), "paused": bool(engine.cfg.get("edit_paused")), "manual": manual}
 
     @app.post("/api/edit/pause")
     async def edit_pause(req: Request):

@@ -1473,6 +1473,7 @@ function editsPage(){
   }
   async function status(){ try{ const r = await api("/api/edit/status");
     $("#edStatus", m).innerHTML = r.left ? `<b>Осталось: ${r.left}</b>${r.errors ? `, <span class="warn">с ошибкой: ${r.errors}</span>` : ""} · исправлено: ${r.done}${r.paused ? ` · <span class="warn">на паузе</span>` : ""}` : (r.done ? `<span class="ok">Исправлено: ${r.done}</span>` : "");
+    if(r.manual && r.manual.length) $("#edStatus", m).innerHTML += `<br><span class="warn">Исправить вручную (нет номера объявления): ${esc(r.manual.join(", "))}</span>`;
     $("#edPauseBtn", m).textContent = r.paused ? "▶ Продолжить" : "⏸ Пауза";
     const bd = $("#bEdits"); bd.textContent = r.left || ""; bd.classList.toggle("hidden", !r.left);
   }catch(e){} }

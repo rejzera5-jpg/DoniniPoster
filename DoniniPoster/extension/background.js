@@ -316,7 +316,10 @@ async function autoCheck() {
     const now = Date.now();
     if (a.lastEdit) {
       // сколько заняло исправление — чтобы следующее начинать, только если успеет до товара очереди
-      if (a.startedAt) a.editDur = Math.round(((a.editDur || 18000) + (now - a.startedAt)) / 2);
+      // (неудачные попытки с повторами не считаем, иначе «время исправления» раздувается и исправления встают)
+      const ok = cur.length && cur.every(([, j]) => j.status === "done");
+      if (a.startedAt && ok) a.editDur = Math.round(((a.editDur || 18000) + (now - a.startedAt)) / 2);
+      a.editDur = Math.min(30000, Math.max(10000, a.editDur || 18000));
       a.editUntil = now + 2000 + Math.round(Math.random() * 2000);
     } else {
       const left = pauseSeconds(await getPub());
@@ -331,7 +334,7 @@ async function autoCheck() {
   try { st = await api("/api/ext/state"); } catch (e) { return; }
   const queueWait = a.queueUntil && Date.now() < a.queueUntil;
   // исправление начинаем, только если оно успеет закончиться до следующего товара очереди — очередь не задерживаем
-  const editFits = !queueWait || Date.now() + (a.editDur || 18000) + 2000 <= a.queueUntil;
+  const editFits = !queueWait || Date.now() + Math.min(30000, a.editDur || 18000) + 2000 <= a.queueUntil;
   const fresh = (st.products || []).filter((p) => !(a.tried || []).includes(p.id));
   const firstEdit = fresh.find((p) => p.edit);
   let next = null, nextSites = [];
