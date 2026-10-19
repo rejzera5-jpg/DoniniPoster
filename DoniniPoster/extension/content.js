@@ -1767,6 +1767,27 @@
         const ut = urlTag();
         if (ut && tags.some((t) => String(t.tagId) === ut)) $("tag").value = ut;
       } catch (e) {}
+      sendSample(sid);
+    }
+    // образец альбома для программы (как у поставщика лежат товары) — один раз на альбом, через 8 сек после открытия
+    let sampled = {};
+    function sendSample(sid) {
+      if (sampled[sid]) return;
+      sampled[sid] = true;
+      setTimeout(async () => {
+        const out = { url: location.href, title: document.title, at: Date.now() };
+        try { out.tags = await (await fetch(`/commodity/tags?hasVideo=0&hideUnCategorized=true&albumId=${encodeURIComponent(sid)}`, { credentials: "include" })).json(); } catch (e) { out.tagsErr = String(e); }
+        try {
+          const j = await (await fetch(`/album/personal/all?albumId=${encodeURIComponent(sid)}&noCache=0&timestamp=-1`, { method: "POST", credentials: "include" })).json();
+          if (j && j.result && Array.isArray(j.result.items)) j.result.items = j.result.items.slice(0, 15);
+          out.items = j;
+        } catch (e) { out.itemsErr = String(e); }
+        try {
+          const imgs = [...document.querySelectorAll("img")].map((i) => i.currentSrc || i.src).filter(isProductImg);
+          out.dom = { imgs: imgs.length, sampleImgs: imgs.slice(0, 12), text: (document.body.innerText || "").slice(0, 3000) };
+        } catch (e) {}
+        bg({ type: "szwegoShop", body: { id: sid, name: (document.title || "").trim(), url: location.href.split("?tagId")[0], sample: out } });
+      }, 8000);
     }
     loadTags();
     $("stopAll").onclick = () => { allStop = true; say("Останавливаю…"); };

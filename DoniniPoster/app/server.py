@@ -161,6 +161,10 @@ def create_app(engine):
         shops[sid] = {"id": sid, "name": old.get("alias") or d.get("name") or old.get("name") or sid, "alias": old.get("alias", ""),
                       "url": d.get("url") or old.get("url"), "tags": d.get("tags") or old.get("tags") or [], "seen": _t.time()}
         SHOPS.write_text(_json.dumps(shops, ensure_ascii=False, indent=1), "utf-8")
+        if d.get("sample"):  # образец альбома — чтобы подстроить скачивание под то, как у поставщика лежат товары
+            import re as _re
+            (C.DATA / f"szwego_sample_{_re.sub(r'[^A-Za-z0-9_-]', '', sid)[:40]}.json").write_text(
+                _json.dumps(d["sample"], ensure_ascii=False, indent=1)[:3_000_000], "utf-8")
         return {"ok": True}
 
     @app.get("/api/szwego/shops")
@@ -180,6 +184,10 @@ def create_app(engine):
         else:
             sh["alias"] = sh["name"] = (d.get("name") or "").strip() or sh["name"]
         SHOPS.write_text(_json.dumps(shops, ensure_ascii=False, indent=1), "utf-8")
+        if d.get("sample"):  # образец альбома — чтобы подстроить скачивание под то, как у поставщика лежат товары
+            import re as _re
+            (C.DATA / f"szwego_sample_{_re.sub(r'[^A-Za-z0-9_-]', '', sid)[:40]}.json").write_text(
+                _json.dumps(d["sample"], ensure_ascii=False, indent=1)[:3_000_000], "utf-8")
         return {"ok": True}
 
     @app.get("/api/woo/lists")
