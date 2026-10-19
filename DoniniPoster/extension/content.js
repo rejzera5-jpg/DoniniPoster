@@ -1708,12 +1708,59 @@
   // этого товара в «Очередь\<вид товара>\<модель> <размер>», размер из описания («尺寸35*30») подставится сам.
   if (IS_TOP && /(^|\.)szwego\.com$/.test(location.hostname)) (function szwego() {
     const shopId = () => {
-      const q = new URLSearchParams(location.search);
-      const v = q.get("shopId") || q.get("shop_id");
-      if (v) return v;
       const m = location.hash.match(/(?:shop_detail|theme_detail)\/([^/?#]+)/);
-      return m ? m[1] : null;
+      if (m) return m[1];
+      const q = new URLSearchParams(location.search);
+      return q.get("shopId") || q.get("shop_id") || null;
     };
+    // лента «相册动态» (посты всех поставщиков, на которых вы подписаны) — у неё свой список и нет разделов
+    const isFeed = () => /#\/album_home/.test(location.hash) || (/link_type=pc_home/.test(location.search) && !/(shop_detail|theme_detail)\//.test(location.hash));
+    const modeKey = () => (isFeed() ? "feed|" : "album|") + (shopId() || "");
+    // одна страница товаров: из альбома поставщика или из ленты
+    async function fetchPage(sid, ts, tag) {
+      if (isFeed()) {
+        const q = new URLSearchParams(location.search);
+        const base = `/album/moments?searchValue=&searchImg=&noCache=0&requestDataType=&link_type=${encodeURIComponent(q.get("link_type") || "pc_home")}&shop_id=${encodeURIComponent(q.get("shop_id") || "")}&shop_name=${encodeURIComponent(q.get("shop_name") || "")}`;
+        const j = await (await fetch(base + (ts && ts !== -1 ? `&slipType=1&timestamp=${ts}` : ""), { credentials: "include" })).json();
+        let items = (j.result && j.result.items) || [];
+        if (tag && String(tag).startsWith("shop:")) { const want = String(tag).slice(5); items = items.filter((x) => x.shop_id === want || x.parent_shop_id === want); }
+        return { items, raw: (j.result && j.result.items) || [], pg: j.result && j.result.pagination };
+      }
+      const r = await fetch(`/album/personal/all?albumId=${encodeURIComponent(sid)}&noCache=0&timestamp=${ts}` + (tag ? `&tagList=%5B${tag}%5D` : ""), { method: "POST", credentials: "include" });
+      const j = await r.json();
+      const items = (j.result && j.result.items) || [];
+      return { items, raw: items, pg: j.result && j.result.pagination };
+    }
+    // Поставщики часто выкладывают товар несколькими постами подряд: сам товар (с ценой и описанием),
+    // а через минуту — «细节图» (детали), «专柜实拍» (фото из бутика). Такие посты-добавки приклеиваем к товару,
+    // чтобы в очередь шёл ОДИН товар со всеми фото. Видео-анонсы (1 кадр) и «明星同款» (фото знаменитостей) пропускаем.
+    const imgsOf = (it) => (it.imgsSrc && it.imgsSrc.length ? it.imgsSrc : it.imgs || []).map(cleanUrl).filter(Boolean);
+    const isVideoTeaser = (it) => !!(it.videoUrl || it.videoURL) && imgsOf(it).length <= 1;
+    const isCeleb = (it) => /明星|同款|上身|街拍/.test(it.title || "") && String(it.title || "").trim().length <= 20;
+    const isAddon = (it) => {
+      const t = String(it.title || "").trim();
+      if (!t) return true;
+      if (/^[^\w]*(?:[pP]|💰|￥|¥)\s*\d{2,}/.test(t)) return false;           // цена — это товар
+      if (/\d+\s*[*xX×]\s*\d+/.test(t) || /尺寸|size/i.test(t)) return false; // размер — товар
+      return t.length <= 20 || imgsOf(it).length <= 2;                         // «细节图», «专柜实拍», 1–2 фото без цены
+    };
+    const ADDON_WINDOW = 15 * 60 * 1000;
+    // склейка потока постов (сначала новые): возвращает функцию, которая получает пост и отдаёт готовый товар или null
+    function makeMerger() {
+      const pend = {}; // магазин -> посты-добавки, ждущие свой товар (он ниже в ленте, т.е. выложен раньше)
+      return (it) => {
+        const shop = it.shop_id || it.parent_shop_id || "";
+        if (isVideoTeaser(it) || isCeleb(it)) return null;
+        if (isAddon(it)) { (pend[shop] = pend[shop] || []).push(it); return null; }
+        const ts = Number(it.time_stamp || it.update_time || 0);
+        const extra = (pend[shop] || []).filter((a) => !ts || !a.time_stamp || (Number(a.time_stamp) - ts >= -60000 && Number(a.time_stamp) - ts <= ADDON_WINDOW));
+        pend[shop] = [];
+        const imgs = imgsOf(it);
+        for (const a of extra.reverse()) for (const u of imgsOf(a)) if (!imgs.includes(u)) imgs.push(u);
+        return { id: it.goods_id || it.parent_goods_id || keyOf(imgs[0]), title: it.title || "", imgs: imgs.slice(0, 30), extra: extra.length,
+                 keys: [it, ...extra].flatMap((x) => imgsOf(x).map(keyOf)) };
+      };
+    }
     const keyOf = (u) => { const m = String(u || "").match(/\/([^/?#]+)\.(?:jpe?g|png|webp)/i); return m ? m[1] : null; };
     const cleanUrl = (u) => String(u || "").replace(/\?.*$/, "");
     const isProductImg = (u) => /xcimg\.szwego\.com\/(img|imgHD)\//.test(u || "");
@@ -1733,7 +1780,8 @@
       .r{margin-top:6px}
     </style><div class="c">⬇ Donini — в очередь. Вид товара:<select id="line"><option>…</option></select>
       <div class="r">Один товар: наведите на его фото → «В очередь».</div>
-      <div class="r">Целиком раздел: <select id="tag" style="max-width:170px"><option value="">весь альбом</option></select><br>
+      <div class="r"><span id="tagLbl">Целиком раздел:</span> <select id="tag" style="max-width:170px"><option value="">весь альбом</option></select><br>
+        Только со словами: <input id="words" placeholder="например 手机壳, iphone" style="width:150px;background:#2b221b;color:#f1e9dd;border:1px solid #5a4a3c;border-radius:6px;padding:2px 4px"><br>
         <button id="all">⬇ Весь раздел в очередь</button> <button id="stopAll" class="s" style="display:none">Стоп</button></div>
       <div class="m" id="msg"></div></div>`;
     const $ = (id) => root.getElementById(id);
@@ -1747,17 +1795,36 @@
       linesLoaded = true;
     }
     $("line").onchange = () => LS("line", $("line").value);
+    $("words").value = LS("words") || "";
+    $("words").oninput = () => LS("words", $("words").value);
+    $("tag").onchange = () => { if (isFeed()) LS("feedShop", $("tag").value); };
     const showHost = () => { if (!document.getElementById(host.id)) document.documentElement.appendChild(host); };
     showHost(); loadLines();
-    setInterval(() => { showHost(); if (!linesLoaded) loadLines(); if (tagsFor !== shopId()) loadTags(); }, 3000);
+    setInterval(() => { showHost(); if (!linesLoaded) loadLines(); if (tagsFor !== modeKey()) { apiShop = null; loadTags(); } }, 3000);
 
     // --- разделы альбома (男包, 钱包 …) и скачивание раздела целиком ---
     let tagsFor = null, allBusy = false, allStop = false;
     const urlTag = () => new URLSearchParams(location.search).get("tagId") || (location.hash.match(/[?&]tagId=(\d+)/) || [])[1] || "";
     async function loadTags() {
       const sid = shopId();
-      tagsFor = sid;
+      tagsFor = modeKey();
       if (!sid) return;
+      if (isFeed()) {
+        $("tagLbl").textContent = "Вся лента или поставщик:";
+        try {
+          const shops = [];
+          for (let p = 1; p <= 10; p++) {
+            const j = await (await fetch(`/service/album/get_album_list.jsp?act=attention_enc&page_index=${p}`, { credentials: "include" })).json();
+            const l = (j.result && j.result.shop_list) || [];
+            if (!l.length) break;
+            l.forEach((x) => { if (x.shop_id && x.shop_id !== sid) shops.push(x); });
+          }
+          $("tag").innerHTML = `<option value="">вся лента (все поставщики)</option>` + shops.map((x) => `<option value="shop:${esc(x.shop_id)}">${esc(x.shop_name || x.shop_id)}</option>`).join("");
+          if (LS("feedShop") && shops.some((x) => "shop:" + x.shop_id === LS("feedShop"))) $("tag").value = LS("feedShop");
+        } catch (e) {}
+        return;
+      }
+      $("tagLbl").textContent = "Целиком раздел:";
       try {
         const j = await (await fetch(`/commodity/tags?hasVideo=0&hideUnCategorized=true&albumId=${encodeURIComponent(sid)}`, { credentials: "include" })).json();
         const tags = (j.result && j.result.allTags) || [];
@@ -1806,20 +1873,22 @@
       const tagName = opt.tagName || ($("tag").selectedOptions[0] ? $("tag").selectedOptions[0].textContent : "") || "весь альбом";
       let ts = -1, done = 0, skipped = 0, noSize = 0, errors = 0, seenIds = new Set();
       say(`Скачиваю «${tagName}»… (можно остановить кнопкой «Стоп»)`);
+      const words = String(opt.words != null ? opt.words : $("words").value || "").split(/[,，;]+/).map((w) => w.trim().toLowerCase()).filter(Boolean);
+      const merge = makeMerger();
+      let filtered = 0;
       try {
         for (let pages = 0; pages < 500 && !allStop; pages++) {
-          const r = await fetch(`/album/personal/all?albumId=${encodeURIComponent(sid)}&noCache=0&timestamp=${ts}` + (tag ? `&tagList=%5B${tag}%5D` : ""), { method: "POST", credentials: "include" });
-          const j = await r.json();
-          const items = (j.result && j.result.items) || [];
-          if (!items.length) break;
-          addItems(items);
+          const { items, raw, pg } = await fetchPage(sid, ts, tag);
+          if (!raw.length) break;
+          addItems(raw);
           for (const it of items) {
             if (allStop) break;
-            const id = it.goods_id || it.parent_goods_id;
-            const imgs = (it.imgsSrc && it.imgsSrc.length ? it.imgsSrc : it.imgs || []).map(cleanUrl).filter(Boolean);
-            if (!id || seenIds.has(id) || !imgs.length || it.isTop || !String(it.title || "").trim()) continue;
-            seenIds.add(id);
-            const res = await bg({ type: "szwegoItem", body: { line, dest: "queue", shop: "", only_new: onlyNew, need_size: true, item: { id, title: it.title || "", imgs } } });
+            if (it.isTop) continue;
+            const rec = merge(it);
+            if (!rec || !rec.id || seenIds.has(rec.id) || !rec.imgs.length || !String(rec.title || "").trim()) continue;
+            if (words.length && !words.some((w) => rec.title.toLowerCase().includes(w))) { filtered++; continue; }
+            seenIds.add(rec.id);
+            const res = await bg({ type: "szwegoItem", body: { line, dest: "queue", shop: "", only_new: onlyNew, need_size: true, item: { id: rec.id, title: rec.title, imgs: rec.imgs } } });
             if (!res || !res.ok) {
               errors++;
               if (!res || /Failed to fetch|не запущ/i.test(res.error || "")) { say("⚠️ Программа Donini Poster не отвечает — запустите её."); allStop = true; break; }
@@ -1827,13 +1896,12 @@
             }
             if (res.skipped) { if (res.reason === "нет размера") noSize++; else skipped++; }
             else done++;
-            say(`⬇ «${tagName}»: в очередь ${done}` + (skipped ? `, уже были ${skipped}` : "") + (noSize ? `, без размера ${noSize}` : "") + (errors ? `, ошибок ${errors}` : "") + (res.folder ? `\nпоследний: ${res.folder}` : ""));
+            say(`⬇ «${tagName}»: в очередь ${done}` + (skipped ? `, уже были ${skipped}` : "") + (noSize ? `, без размера ${noSize}` : "") + (errors ? `, ошибок ${errors}` : "") + (res.folder ? `\nпоследний: ${res.folder}` + (rec.extra ? ` (+${rec.extra} пост(а) с доп. фото)` : "") : ""));
           }
-          const pg = j.result && j.result.pagination;
           if (!pg || !pg.isLoadMore || !pg.pageTimestamp || pg.pageTimestamp === ts) break;
           ts = pg.pageTimestamp;
         }
-        say(`${allStop ? "Остановлено" : "Готово"}: в очередь ${done}` + (skipped ? `, уже были раньше ${skipped}` : "") + (noSize ? `, пропущено без размера в описании ${noSize}` : "") + (errors ? `, ошибок ${errors}` : "") + ".");
+        say(`${allStop ? "Остановлено" : "Готово"}: в очередь ${done}` + (filtered ? `, без нужных слов ${filtered}` : "") + (skipped ? `, уже были раньше ${skipped}` : "") + (noSize ? `, пропущено без размера в описании ${noSize}` : "") + (errors ? `, ошибок ${errors}` : "") + ".");
       } catch (e) { say("⚠️ " + e.message); errors++; }
       allBusy = false;
       $("all").style.display = ""; $("stopAll").style.display = "none";
@@ -1881,11 +1949,13 @@
     // --- поиск товара по фото ---
     const apiMap = new Map(); // ключ фото -> товар из списка альбома
     let apiTs = -1, apiDone = false, apiShop = null;
+    let hoverMerge = null;
     function addItems(items) {
+      if (!hoverMerge) hoverMerge = makeMerger();
       for (const it of items || []) {
-        const imgs = (it.imgsSrc && it.imgsSrc.length ? it.imgsSrc : it.imgs || []).map(cleanUrl).filter(Boolean);
-        const rec = { id: it.goods_id || it.parent_goods_id || keyOf(imgs[0]), title: it.title || "", imgs };
-        for (const u of imgs) { const k = keyOf(u); if (k && !apiMap.has(k)) apiMap.set(k, rec); }
+        const rec = hoverMerge(it);
+        if (!rec) continue;
+        for (const k of rec.keys) if (k && !apiMap.has(k)) apiMap.set(k, rec);
       }
     }
     async function findInAlbum(key) {
@@ -1893,18 +1963,17 @@
       if (!sid) return null;
       // в разделе (男包, 钱包 …) ищем только среди его товаров — так в разы быстрее, чем по всему альбому
       const tag = urlTag() || $("tag").value || "";
-      if (apiShop !== sid + "|" + tag) { apiTs = -1; apiDone = false; apiShop = sid + "|" + tag; }
+      if (apiShop !== modeKey() + "|" + tag) { apiTs = -1; apiDone = false; apiShop = modeKey() + "|" + tag; apiMap.clear(); hoverMerge = null; }
       if (apiMap.has(key)) return apiMap.get(key);
       for (let p = 0; p < 60 && !apiDone; p++) {
         let j = null;
         btn.textContent = `⏳ ищу товар… (${p * 32})`;
+        let items = [], pg = null;
         try {
-          const r = await fetch(`/album/personal/all?albumId=${encodeURIComponent(sid)}&noCache=0&timestamp=${apiTs}` + (tag ? `&tagList=%5B${tag}%5D` : ""), { method: "POST", credentials: "include" });
-          j = await r.json();
+          const r = await fetchPage(sid, apiTs, isFeed() ? "" : tag);
+          items = r.raw; pg = r.pg;
         } catch (e) { break; }
-        const items = (j && j.result && j.result.items) || [];
         addItems(items);
-        const pg = j && j.result && j.result.pagination;
         if (!items.length || !pg || !pg.isLoadMore || !pg.pageTimestamp || pg.pageTimestamp === apiTs) apiDone = true;
         else apiTs = pg.pageTimestamp;
         if (apiMap.has(key)) return apiMap.get(key);
