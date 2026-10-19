@@ -149,14 +149,30 @@ def norm(num, suf):
 
 LIST_RE = re.compile(r"(?<![\d.])((?:1[0-9]|20)(?:\s*[/、,，|]\s*(?:1[0-9]|20))+)\s*" + SUF + r"(?![\d*xX×.])", re.I)
 
-_SKIP_LINE = re.compile(r"定制|无做|不做|没有|不退|系列")
+_SKIP_LINE = re.compile(r"无做|不做|没有|系列")
+_TOKEN_RE = re.compile(r"^(?:iphone|苹果|ip)?\s*(\d{1,2})\s*" + SUF + r"$", re.I)
 
 
 def parse_phone_models(text):
-    # строки «需定制型号（15/14…）» (под заказ), «无做14plus» (нет), «iPhone18系列更新» (заголовок) — не модели в наличии
-    lines = [ln for ln in (text or "").splitlines() if not _SKIP_LINE.search(ln)]
+    # «无做14plus» (такой модели нет) и «iPhone18系列更新» (заголовок) — не модели.
+    # «需定制型号（15/15pro/14pm…）» — модели под заказ: берём их тоже (список через / и запятые)
+    out, custom = [], []
+    lines = []
+    for ln in (text or "").splitlines():
+        if _SKIP_LINE.search(ln):
+            continue
+        if "定制" in ln:
+            inner = re.findall(r"[（(]([^）)]*)[）)]", ln) or [ln]
+            for part in inner:
+                for tok in re.split(r"[/，,、\s]+", part):
+                    m = _TOKEN_RE.match(tok.strip())
+                    if m and 6 <= int(m.group(1)) <= 20:
+                        v = norm(m.group(1), m.group(2))
+                        if v not in custom:
+                            custom.append(v)
+            continue
+        lines.append(ln)
     text = "\n".join(lines)
-    out = []
     for m in LIST_RE.finditer(text or ""):
         for n in re.findall(r"\d+", m.group(1)):
             v = norm(n, m.group(2))
@@ -172,7 +188,7 @@ def parse_phone_models(text):
         v = norm(num, suf)
         if v not in out:
             out.append(v)
-    return out
+    return out + [c for c in custom if c not in out]  # сначала модели в наличии, потом под заказ
 
 
 
@@ -200,6 +216,8 @@ def short_models(model_text):
             n = m.group(1).upper()
             if n not in nums:
                 nums.append(n)
+    if len(nums) > 3 and all(n.isdigit() for n in nums):  # много поколений — диапазоном: «iPhone 13–18»
+        return f"iPhone {min(map(int, nums))}–{max(map(int, nums))}"
     return "iPhone " + " / ".join(nums) if nums else t
 
 
