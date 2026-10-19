@@ -1102,8 +1102,8 @@
     { code: "BE", name: "Бельгия", tm: "Telefoonhoesje @@M@@ @@B@@", tp: "Telefoonhoesje @@B@@", body: "Geschikt voor: @@M@@\nMateriaal: hoogwaardig materiaal\nPast perfect en beschermt de telefoon tegen stoten en krassen.\nLevertijd: ongeveer 14 dagen.\nUitstekende kwaliteit.\nFoto's van het echte product!\n\nBetaling onder rembours of via bankoverschrijving.\nIdeaal als cadeau!" }
   ];
   const PHONECASES_LANGS = PHONECASES_RAW.map(r => ({ code: r.code, name: r.name,
-    title: (b) => fillCase(r.tm, b, caseModel()),
-    body: (s) => r.body.replace("@@M@@", caseModel(s)) }));
+    title: (b) => fillCase(r.tp, b, ""),
+    body: () => r.body.split("\n").slice(1).join("\n") }));  // универсальный текст — без модели телефона
   const BUILT_IN_TYPES = [
     { id: "bags", label: "Сумки", langs: BAGS_LANGS },
     { id: "wallets", label: TYPE_LABELS.wallets, langs: buildTypeLangs("wallets") },
@@ -1118,17 +1118,7 @@
     { id: "caps", label: TYPE_LABELS.caps, langs: buildTypeLangs("caps") },
     { id: "phonecases", label: "Чехлы", langs: PHONECASES_LANGS }
   ];
-  // у чехлов поле «Размер» — это модель телефона
-  setInterval(() => {
-    const lab = document.querySelector('label[for="size"]');
-    if (!lab) return;
-    const isCase = currentTypeId === "phonecases";
-    const want = isCase ? "Модель телефона" : "Размер";
-    if (lab.textContent !== want) {
-      lab.textContent = want;
-      if (isCase && /\d\s*[*x×]\s*\d/.test(sizeInput.value)) { sizeInput.value = CASE_DEFAULT_MODEL; sizeInput.dispatchEvent(new Event("input", { bubbles: true })); }
-    }
-  }, 400);
+
 
   function customTypeToRuntime(ct){
     return {

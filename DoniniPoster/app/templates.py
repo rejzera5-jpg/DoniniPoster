@@ -368,6 +368,8 @@ def _apply_overrides(type_id, lang, size, code, brand, title, body):
 
 def build_texts(type_id, lang, size, code, brand="", custom=None):
     """Возвращает (название, описание) ровно как в Donini Manager (с его правками в карточках)."""
+    if type_id == "phonecases":
+        size = ""  # чехлы — универсальный текст, без модели/размера
     title, body = _build_texts_base(type_id, lang, size, code, brand, custom)
     title, (b, _) = _apply_overrides(type_id, lang, size, code, brand, title, body)
     if isinstance(b, dict) and ((b.get("text") or "").strip() or (b.get("base") or "").strip()):
@@ -379,14 +381,9 @@ def build_texts(type_id, lang, size, code, brand="", custom=None):
             elif len(old_size) >= 3 and old_size in text:
                 text = text.replace(old_size, size)
         body = text
-    if type_id == "phonecases":
-        title = title.replace("{model}", short_models(size)).replace("{size}", short_models(size))
-        title = _case_title_model(title, short_models(size), code, brand)
-        body = body.replace("{model}", size or "").replace("{size}", size or "")
-        if (size or "").strip() and size not in body:
-            # текст чехлов поправлен в Donini Manager без строки модели — добавляем её сверху
-            lab = PHONECASES.get(lang, PHONECASES["PL"])["body"]("").split(":")[0]
-            body = f"{lab}: {size}\n{body}"
+    if type_id == "phonecases":  # чехлы — универсальный текст: без модели телефона
+        title = " ".join(title.replace("{model}", "").replace("{size}", "").split())
+        body = body.replace("{model}", "").replace("{size}", "")
     if not (size or "").strip():
         # размера нет — строку «Rozmiar: …» убираем совсем (иначе в объявлении остался бы размер из шаблона)
         body = SIZE_LINE_DROP_RE.sub("", body).lstrip("\n")
@@ -397,7 +394,7 @@ def _build_texts_base(type_id, lang, size, code, brand="", custom=None):
     custom = custom or []
     if type_id in BUILT_IN:
         t = BUILT_IN[type_id][lang]
-        title = t["title_m"](brand, short_models(size)) if "title_m" in t else t["title"](brand)
+        title = t["title_m"](brand, "") if "title_m" in t else t["title"](brand)
         body = t["body"](size)
     else:
         ct = next((c for c in custom if c["id"] == type_id), None)

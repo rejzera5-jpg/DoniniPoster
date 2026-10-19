@@ -158,9 +158,7 @@ def download_item(cfg, line, dest, shop, item, only_new=True, need_size=True, lo
         return {"ok": True, "skipped": True, "reason": "уже скачан"}
     is_case = (line.get("template") == "phonecases")
     models = []
-    if is_case:  # чехлы: вместо размера — модель телефона из описания
-        from .templates import parse_phone_models
-        models = parse_phone_models(text)
+    if is_case:  # чехлы: текст универсальный (из Donini Manager), размер/модель не берём
         sizes, need_size = [], False
     else:
         sizes = parse_sizes(text)
@@ -172,7 +170,7 @@ def download_item(cfg, line, dest, shop, item, only_new=True, need_size=True, lo
     name = latin_name(text)
     if is_case:
         from .templates import short_models, compact_models
-        name = f"{name} — чехол " + (short_models(compact_models(models)).replace(" / ", ", ") if models else "модель?")
+        name = f"{name} чехол" if name != "Товар" else "Чехол"
     name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', " ", name)
     if sizes:
         name = f"{name} {' '.join(s.replace('*', 'x') for s in sizes)}"
@@ -206,6 +204,15 @@ def download_item(cfg, line, dest, shop, item, only_new=True, need_size=True, lo
     if models:  # в объявлении будет «Model telefonu: iPhone 18 Pro Max» и модель в названии
         (tmp / "info.txt").write_text("размер: " + compact_models(models) + "\n", "utf-8")
     (tmp / "описание.txt").write_text(text, "utf-8")
+    from .brands import detect_brand
+    if not detect_brand(text) and cfg.get("ai_key"):
+        # поставщик бренд не написал — смотрит ИИ по фото
+        from .ai_brand import brand_from_photos
+        ai = brand_from_photos(cfg, sorted(tmp.glob("*.jpg")), log)
+        if ai:
+            name = re.sub(r"^(Товар|Чехол)\b", "", name).strip()
+            name = f"{ai} {name}".strip()[:110]
+            log(f"🤖 Бренд по фото: {ai}")
     (tmp / ".ready").write_text("", "utf-8")
 
     final, n = base / name, 2

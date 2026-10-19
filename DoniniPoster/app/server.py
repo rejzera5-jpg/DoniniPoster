@@ -814,6 +814,7 @@ def create_app(engine):
     @app.get("/api/config")
     async def get_config():
         cfg = dict(engine.cfg)
+        cfg["ai_key_set"] = bool(cfg.pop("ai_key", ""))  # сам ключ в окно не отдаём
         return cfg
 
     @app.post("/api/config")
@@ -823,6 +824,12 @@ def create_app(engine):
         # счётчик меняем, только если вы его правда изменили (иначе не откатываем выданные коды)
         if "code_counter" in data and data.get("code_counter_was") == data["code_counter"]:
             data.pop("code_counter")
+        if (data.get("ai_key") or "").strip():
+            cfg["ai_key"] = data["ai_key"].strip()
+        if data.get("ai_key_clear"):
+            cfg.pop("ai_key", None)
+        if "ai_brand" in data:
+            cfg["ai_brand"] = bool(data["ai_brand"])
         for k in ("code_counter", "shared_counter", "queue_root", "done_root", "delete_done_after_days",
                   "work_hours", "rates", "photo_max_side", "telegram", "browser_channel", "proxy", "lines", "photo_qc"):
             if k in data:
@@ -1877,6 +1884,28 @@ def create_app(engine):
         if brand and brand.lower() in repl.lower():
             brand = ""
         return " ".join(x for x in (repl, brand, str(p.get("code") or "")) if x).strip()
+
+    @app.post("/api/queue/ai_brand")
+    async def queue_ai_brand(req: Request):
+        """Бренд по фото (ИИ) для выбранных товаров — пишется в поле «Бренд» карточки."""
+        from .ai_brand import brand_from_photos
+        d = await req.json()
+        if not engine.cfg.get("ai_key"):
+            return {"ok": False, "error": "Впишите ключ Claude API в «Настройки» → «Бренд по фото»"}
+        found = miss = 0
+        for pid in d.get("ids") or []:
+            p = engine.state["products"].get(pid)
+            if not p:
+                continue
+            b = await asyncio.to_thread(brand_from_photos, engine.cfg, [x for x in p.get("photos") or [] if Path(x).exists()], engine.log)
+            if b:
+                p["brand"] = b
+                found += 1
+            else:
+                miss += 1
+        engine.save()
+        engine.log(f"🤖 Бренд по фото: найден у {found}, не понял у {miss}")
+        return {"ok": True, "found": found, "miss": miss}
 
     @app.post("/api/edit/preview")
     async def edit_preview(req: Request):
