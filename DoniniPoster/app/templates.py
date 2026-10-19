@@ -216,6 +216,8 @@ def short_models(model_text):
             n = m.group(1).upper()
             if n not in nums:
                 nums.append(n)
+    if len(nums) == 1:  # одно поколение — все модели: «iPhone 18 Pro Max / 18 Pro»
+        return " / ".join(x.strip() for x in t.split(","))
     if len(nums) > 3 and all(n.isdigit() for n in nums):  # много поколений — диапазоном: «iPhone 13–18»
         return f"iPhone {min(map(int, nums))}–{max(map(int, nums))}"
     return "iPhone " + " / ".join(nums) if nums else t
@@ -378,7 +380,13 @@ def build_texts(type_id, lang, size, code, brand="", custom=None):
                 text = text.replace(old_size, size)
         body = text
     if type_id == "phonecases":
-        title = _case_title_model(title, short_models(size), code)
+        title = title.replace("{model}", short_models(size)).replace("{size}", short_models(size))
+        title = _case_title_model(title, short_models(size), code, brand)
+        body = body.replace("{model}", size or "").replace("{size}", size or "")
+        if (size or "").strip() and size not in body:
+            # текст чехлов поправлен в Donini Manager без строки модели — добавляем её сверху
+            lab = PHONECASES.get(lang, PHONECASES["PL"])["body"]("").split(":")[0]
+            body = f"{lab}: {size}\n{body}"
     if not (size or "").strip():
         # размера нет — строку «Rozmiar: …» убираем совсем (иначе в объявлении остался бы размер из шаблона)
         body = SIZE_LINE_DROP_RE.sub("", body).lstrip("\n")
@@ -413,7 +421,7 @@ def _build_texts_base(type_id, lang, size, code, brand="", custom=None):
     return title, body
 
 
-def _case_title_model(title, model, code):
+def _case_title_model(title, model, code, brand=""):
     """Чехлы: в названии должна стоять модель этого товара. Если название поправлено в Donini Manager
     с моделью-примером («Etui iPhone 17 Pro») — модель-пример меняется на модель товара."""
     model = (model or "").strip()
@@ -431,6 +439,8 @@ def _case_title_model(title, model, code):
     t2 = " ".join(t2.split())
     if model.lower() in t2.lower():
         return t2
+    if brand and f" {brand}" in f" {t2}" and not t2.startswith(brand):  # «Etui skórzane Gucci» → «Etui skórzane iPhone 18 Gucci»
+        return t2.replace(f" {brand}", f" {model} {brand}", 1)
     code = str(code or "")
     if code and t2.endswith(code):
         return f"{t2[:-len(code)].strip()} {model} {code}"
