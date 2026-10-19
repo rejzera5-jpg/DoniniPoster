@@ -70,6 +70,36 @@ def product_name(text):
     return "товар"
 
 
+_STOP = {"logo", "size", "cm", "iphone", "pro", "max", "promax", "plus", "mini", "air", "ok", "new", "top", "pm", "p", "vip",
+         "the", "and", "of", "zp", "bb", "mm", "x", "lv", "l", "g", "f", "d", "c", "h", "bbr", "bur", "cc", "dio"}
+
+
+def latin_name(text):
+    """Название папки без китайского: «Louis Vuitton Passy», «Fendi FF», а если латиницы нет — просто бренд.
+    Бренд — по описанию поставщика (в т.ч. «Lv», «L卡包», «罗意威»)."""
+    from .brands import detect_brand, BRANDS
+    brand = detect_brand(text)
+    aliases = set()
+    for canon, al in BRANDS:
+        if canon == brand:
+            aliases = {a for a in al if a.isascii()} | {w.lower() for w in canon.split()}
+    words = []
+    for w in re.findall(r"[A-Za-z][A-Za-z0-9&'.+-]*", (text or "")[:300]):
+        lw = w.lower().strip(".-'")
+        if brand == "Louis Vuitton" and re.match(r"lv[a-z]{2,}", lw):
+            w, lw = w[2:], lw[2:]  # «LVPassy» → «Passy»
+        if len(lw) < 2 or lw in _STOP or lw in aliases or any(lw == a.replace(" ", "") for a in aliases):
+            continue
+        if re.fullmatch(r"[a-z]?\d+[a-z]*", lw) or re.search(r"\d", lw):  # цены, коды, размеры (p170, x36x21)
+            continue
+        if w not in words:
+            words.append(w)
+        if len(words) >= 4:
+            break
+    name = " ".join([brand] + words).strip()
+    return name or "Товар"
+
+
 def _load_seen():
     try:
         return json.loads(SEEN_FILE.read_text("utf-8"))
@@ -139,10 +169,10 @@ def download_item(cfg, line, dest, shop, item, only_new=True, need_size=True, lo
 
     base = target_dir(cfg, line, dest, shop)
     base.mkdir(parents=True, exist_ok=True)
-    name = product_name(text)
+    name = latin_name(text)
     if is_case:
         from .templates import short_models, compact_models
-        name = f"{name} — " + (short_models(compact_models(models)).replace(" / ", ", ") if models else "модель?")
+        name = f"{name} — чехол " + (short_models(compact_models(models)).replace(" / ", ", ") if models else "модель?")
     name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', " ", name)
     if sizes:
         name = f"{name} {' '.join(s.replace('*', 'x') for s in sizes)}"

@@ -49,6 +49,19 @@ def _is_cjk(s):
     return any("一" <= ch <= "鿿" for ch in s)
 
 
+# Как китайские поставщики пишут бренд сокращённо: «Lv手机包», «LVPassy», «L卡包», «L 孔», «大F», «BBr», «小香»
+SHORT = [
+    ("Louis Vuitton", r"(?<![a-z])lv(?=[a-z]{2,})|(?<![a-z0-9])l\s?(?=[\u4e00-\u9fff])|l家"),
+    ("Fendi", r"(?<![a-z0-9])f(?=[\u4e00-\u9fff《【])|大f(?![a-z])|f家"),
+    ("Burberry", r"(?<![a-z])(?:bbr|bur)(?![a-z])|𝐁𝐁𝐫"),
+    ("Chanel", r"小香|(?<![a-z])cc(?![a-z])"),
+    ("Gucci", r"(?<![a-z0-9])g(?=[\u4e00-\u9fff])|g家"),
+    ("Dior", r"(?<![a-z0-9])d(?=[\u4e00-\u9fff])|d家|dio\*"),
+    ("Prada", r"p家"),
+    ("Hermes", r"h家"),
+]
+
+
 def detect_brand(*texts):
     """Первый найденный бренд (по самому раннему упоминанию в тексте)."""
     for text in texts:
@@ -56,6 +69,10 @@ def detect_brand(*texts):
             continue
         low = str(text).lower()
         best = None
+        for canon, pat in SHORT:
+            m = re.search(pat, low)
+            if m and (best is None or m.start() < best[0]):
+                best = (m.start() + 0.5, canon)  # при равенстве полное название важнее сокращения
         for canon, aliases in BRANDS:
             for a in aliases:
                 if _is_cjk(a):
