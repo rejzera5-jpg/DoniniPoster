@@ -22,6 +22,34 @@ from .templates import build_texts, convert_price
 # сайты, где бренд из названия папки сам добавляется в название объявления
 BRAND_SITES = {"vatera", "njukalo", "njuskalo"}
 
+
+# сколько символов сайт принимает в названии (если больше — сайт не даёт выставить)
+TITLE_MAX = {"njukalo": 70}
+
+
+def shorten_title(title, mx, keep):
+    """Укорачивает название до mx символов: сначала убирает лишние знаки (« – », запятые),
+    потом слова с конца текста. Бренд и код (keep) остаются в конце как были."""
+    import re as _re
+    tail = ""
+    t = title
+    for k in reversed([x for x in keep if x]):
+        if t.endswith(k):
+            tail = (" " + k + tail) if tail else (" " + k)
+            t = t[: -len(k)].rstrip()
+    tail = tail.strip()
+    room = mx - (len(tail) + 1 if tail else 0)
+    if len(t) > room:
+        t = _re.sub(r"\s*[–—-]\s+", " ", t)
+        t = " ".join(t.split())
+    if len(t) > room:
+        t = t.replace(",", "")
+        t = " ".join(t.split())
+    while len(t) > room and " " in t:
+        t = t.rsplit(" ", 1)[0].rstrip(",;:–—- ")
+    t = t[:max(room, 0)].rstrip()
+    return f"{t} {tail}".strip() if tail else t
+
 class Engine:
     def __init__(self):
         self.cfg = C.load_config()
@@ -137,6 +165,9 @@ class Engine:
             title = own["title"]
         if own.get("body"):
             body = own["body"]
+        mx = int(site.get("title_max") or TITLE_MAX.get(site.get("id"), 0) or 0)
+        if mx and len(title.strip()) > mx:  # сайт не принимает длинное название — укорачиваем текст, бренд и код оставляем
+            title = shorten_title(title.strip(), mx, [brand if use_brand else "", str(product["code"])])
         title += " " * int(site.get("title_spaces") or 0)  # пробелы после названия (настройка сайта)
         conv = convert_price(float(product.get("price") or 0), lang, self.cfg.get("rates"), site.get("currency"))
         price, cur = conv if conv else ("", "")

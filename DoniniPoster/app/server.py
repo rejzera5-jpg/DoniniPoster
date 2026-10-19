@@ -874,7 +874,7 @@ def create_app(engine):
         if not s:
             raise HTTPException(404)
         for k in ("name", "lang", "start_url", "enabled", "type", "plugin", "min_interval_min", "jitter_pct",
-                  "daily_limit", "max_photos", "confirm_before_publish", "scenarios", "title_spaces", "title_brand", "currency"):
+                  "daily_limit", "max_photos", "confirm_before_publish", "scenarios", "title_spaces", "title_brand", "currency", "title_max"):
             if k in data:
                 s[k] = data[k]
         C.save_site(s)
