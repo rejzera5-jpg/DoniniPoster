@@ -133,6 +133,72 @@ BUILT_IN = {"bags": BAGS}
 for _t in TYPE_NOUNS:
     BUILT_IN[_t] = _build_type(_t)
 
+# ---- Чехлы для телефонов: вместо размера — модель телефона («iPhone 18 Pro Max») ----
+# Модель берётся из описания поставщика (18promax, 苹果18 Pro, 16/17/18 ProMax…) и стоит в поле «размер» товара.
+import re as _re_ph
+re = _re_ph
+SUF = r"(pro\s*max|promax|p\s*max|pm|pro|plus|max|mini|air|e)?"
+PHONE_RE = re.compile(r"(?:(iphone|苹果|苹果手机|ip|i)\s*)?(?<![\d.])(6|7|8|1[0-9]|20|x[rs]?|se)\s*" + SUF + r"(?![\d*xX×.])", re.I)
+
+def norm(num, suf):
+    num = num.upper() if num.lower().startswith("x") else num
+    if num.lower() == "se": num = "SE"
+    s = (suf or "").lower().replace(" ", "")
+    s = {"promax": " Pro Max", "pmax": " Pro Max", "pm": " Pro Max", "pro": " Pro", "plus": " Plus", "max": " Max", "mini": " mini", "air": " Air", "e": "e"}.get(s, "")
+    return f"iPhone {num}{s}"
+
+LIST_RE = re.compile(r"(?<![\d.])((?:1[0-9]|20)(?:\s*[/、,，|]\s*(?:1[0-9]|20))+)\s*" + SUF + r"(?![\d*xX×.])", re.I)
+
+def parse_phone_models(text):
+    out = []
+    for m in LIST_RE.finditer(text or ""):
+        for n in re.findall(r"\d+", m.group(1)):
+            v = norm(n, m.group(2))
+            if v not in out:
+                out.append(v)
+    text = LIST_RE.sub(" ", text or "")
+    for m in PHONE_RE.finditer(text or ""):
+        pre, num, suf = m.groups()
+        if not pre and not suf:
+            continue  # голое число — это может быть цена/размер
+        if pre and pre.lower() == "i" and not suf:
+            continue
+        v = norm(num, suf)
+        if v not in out:
+            out.append(v)
+    return out
+
+
+
+def phone_models_text(text):
+    return ", ".join(parse_phone_models(text))
+
+
+def _case(m_title, plain, label, body_rest):
+    return {"title_m": lambda b, m: " ".join(x for x in ((m_title.format(m=m) if m else plain), b) if x),
+            "title": lambda b: " ".join(x for x in (plain, b) if x),
+            "body": lambda m: f"{label}: {m}\n{body_rest}"}
+
+
+PHONECASES = {
+    "HU": {"title_m": lambda b, m: " ".join(x for x in (b, "Márkás telefontok", m) if x),
+           "title": lambda b: f"{b} Márkás telefontok".strip(),
+           "body": lambda m: f"Telefon típusa: {m}\nAnyag: kiváló minőségű anyag\nPontosan illeszkedik, védi a telefont az ütésektől és karcolásoktól\n\nA fotók valódiak!\n\nA minőség kiváló!\n\nAjándéknak is tökéletes!!!\n\nSzállítás 2–4 héten belül"},
+    "DE": _case("Handyhülle {m}", "Handyhülle", "Passend für", "Material: hochwertiges Material\nPasst perfekt und schützt das Handy vor Stößen und Kratzern.\nLieferzeit: ca. 14 Tage.\nHervorragende Qualität.\nFotos vom tatsächlichen Produkt!\n\nZahlung per Nachnahme oder per Banküberweisung.\nIdeal als Geschenk!"),
+    "PT": _case("Capa para {m}", "Capa para telemóvel", "Compatível com", "Material: material de alta qualidade\nAjuste perfeito, protege o telemóvel contra quedas e riscos.\nPrazo de entrega: aproximadamente 14 dias.\nQualidade excelente.\nFotos do produto real!\nPagamento à cobrança ou por transferência bancária.\nIdeal para oferecer como presente!"),
+    "ES": _case("Funda {m}", "Funda de móvil", "Compatible con", "Material: alta calidad\nAjuste perfecto, protege el móvil de golpes y arañazos\nEntrega: Aprox. 4-5 días\nExcelente calidad\n¡Foto real!\n\nEnvío a cualquier país."),
+    "NL": _case("Telefoonhoesje {m}", "Telefoonhoesje", "Geschikt voor", "Materiaal: hoogwaardig materiaal\nPast perfect en beschermt de telefoon tegen stoten en krassen.\nLevertijd: ongeveer 14 dagen.\nUitstekende kwaliteit.\nFoto's van het echte product!\n\nBetaling onder rembours of via bankoverschrijving.\nIdeaal als cadeau!"),
+    "PL": _case("Etui {m}", "Etui na telefon", "Model telefonu", "Materiał: wysokiej jakości\nIdealnie dopasowane, chroni telefon przed uderzeniami i zarysowaniami.\nCzas dostawy: ok. 14 dni.\nDoskonała jakość.\nZdjęcia rzeczywistego produktu!\n\nPłatność za pobraniem lub przelewem.\nIdealny prezent!"),
+    "RO": _case("Husă {m}", "Husă telefon", "Compatibil cu", "Material: de calitate superioară\nSe potrivește perfect și protejează telefonul de lovituri și zgârieturi.\nTermen de livrare: aprox. 14 zile.\nCalitate excelentă.\nFotografii reale ale produsului!\n\nPlata ramburs sau prin transfer bancar.\nIdeal ca cadou!"),
+    "HR": _case("Maska za {m}", "Maska za mobitel", "Za model", "Materijal: kvalitetan materijal\nSavršeno pristaje i štiti mobitel od udaraca i ogrebotina.\nRok isporuke: oko 14 dana.\nOdlična kvaliteta.\nStvarne fotografije proizvoda!\n\nPlaćanje pouzećem ili bankovnim transferom.\nIdealno za poklon!"),
+    "CZ": _case("Pouzdro na {m}", "Pouzdro na mobil", "Pro model", "Materiál: kvalitní materiál\nPerfektně sedí a chrání telefon před nárazy a poškrábáním.\nDoba dodání: cca 14 dní.\nVynikající kvalita.\nSkutečné fotografie produktu!\n\nPlatba na dobírku nebo bankovním převodem.\nIdeální jako dárek!"),
+    "GR": _case("Θήκη κινητού {m}", "Θήκη κινητού", "Συμβατό με", "Υλικό: υψηλής ποιότητας υλικό\nΤέλεια εφαρμογή, προστατεύει το κινητό από χτυπήματα και γρατζουνιές.\nΧρόνος παράδοσης: περίπου 14 ημέρες.\nΕξαιρετική ποιότητα.\nΠραγματικές φωτογραφίες του προϊόντος!\n\nΠληρωμή με αντικαταβολή ή με τραπεζική μεταφορά.\nΙδανικό για δώρο!"),
+}
+PHONECASES["AT"] = PHONECASES["DE"]
+PHONECASES["BE"] = PHONECASES["NL"]
+BUILT_IN["phonecases"] = PHONECASES
+TYPE_LABELS["phonecases"] = "Чехлы"
+
 # ---- Валюты (снимок курсов как в Donini, можно поменять в настройках) ----
 DEFAULT_RATES = {"EUR": 0.228504, "HUF": 84.103327, "RON": 1.210063, "CZK": 5.589892}
 LANG_CURRENCY = {"HU": "HUF", "DE": "EUR", "PT": "EUR", "ES": "EUR", "NL": "EUR", "PL": "PLN", "RO": "RON", "HR": "EUR", "CZ": "CZK",
@@ -182,13 +248,13 @@ def decode_donini_code(text):
 
 
 SIZE_LINE_RE = __import__("re").compile(
-    r"^(\s*(?:méretek|méret|Größe|Grösse|Tamanho|Tamaño|Afmetingen|Rozmiar|Wymiary|Dimensiuni|Veličina|Velikost|Rozměry|Μέγεθος|Size|Размер)\s*:\s*).*$",
+    r"^(\s*(?:méretek|méret|Größe|Grösse|Tamanho|Tamaño|Afmetingen|Rozmiar|Wymiary|Dimensiuni|Veličina|Velikost|Rozměry|Μέγεθος|Size|Размер|Telefon típusa|Passend für|Compatível com|Compatible con|Geschikt voor|Model telefonu|Compatibil cu|Za model|Pro model|Συμβατό με|Модель)\s*:\s*).*$",
     __import__("re").IGNORECASE | __import__("re").MULTILINE)
 
 
 # вся строка с размером (без захвата следующей строки) — убирается, когда размера у товара нет
 SIZE_LINE_DROP_RE = __import__("re").compile(
-    r"^[ \t]*(?:méretek|méret|Größe|Grösse|Tamanho|Tamaño|Afmetingen|Rozmiar|Wymiary|Dimensiuni|Veličina|Velikost|Rozměry|Μέγεθος|Size|Размер)[ \t]*:[^\n]*(?:\n|$)",
+    r"^[ \t]*(?:méretek|méret|Größe|Grösse|Tamanho|Tamaño|Afmetingen|Rozmiar|Wymiary|Dimensiuni|Veličina|Velikost|Rozměry|Μέγεθος|Size|Размер|Telefon típusa|Passend für|Compatível com|Compatible con|Geschikt voor|Model telefonu|Compatibil cu|Za model|Pro model|Συμβατό με|Модель)[ \t]*:[^\n]*(?:\n|$)",
     __import__("re").IGNORECASE | __import__("re").MULTILINE)
 
 
@@ -264,6 +330,8 @@ def build_texts(type_id, lang, size, code, brand="", custom=None):
             elif len(old_size) >= 3 and old_size in text:
                 text = text.replace(old_size, size)
         body = text
+    if type_id == "phonecases":
+        title = _case_title_model(title, size, code)
     if not (size or "").strip():
         # размера нет — строку «Rozmiar: …» убираем совсем (иначе в объявлении остался бы размер из шаблона)
         body = SIZE_LINE_DROP_RE.sub("", body).lstrip("\n")
@@ -274,7 +342,7 @@ def _build_texts_base(type_id, lang, size, code, brand="", custom=None):
     custom = custom or []
     if type_id in BUILT_IN:
         t = BUILT_IN[type_id][lang]
-        title = t["title"](brand)
+        title = t["title_m"](brand, size) if "title_m" in t else t["title"](brand)
         body = t["body"](size)
     else:
         ct = next((c for c in custom if c["id"] == type_id), None)
@@ -296,3 +364,27 @@ def _build_texts_base(type_id, lang, size, code, brand="", custom=None):
     if code:
         title = f"{title} {code}"
     return title, body
+
+
+def _case_title_model(title, model, code):
+    """Чехлы: в названии должна стоять модель этого товара. Если название поправлено в Donini Manager
+    с моделью-примером («Etui iPhone 17 Pro») — модель-пример меняется на модель товара."""
+    model = (model or "").strip()
+    if not model:
+        return title
+    first = [True]
+
+    def rep(m):
+        if first[0]:
+            first[0] = False
+            return model
+        return ""
+    t2 = LIST_RE.sub(rep, title) if LIST_RE.search(title) else title
+    t2 = PHONE_RE.sub(lambda m: rep(m) if (m.group(1) or m.group(3)) else m.group(0), t2)
+    t2 = " ".join(t2.split())
+    if model.lower() in t2.lower():
+        return t2
+    code = str(code or "")
+    if code and t2.endswith(code):
+        return f"{t2[:-len(code)].strip()} {model} {code}"
+    return f"{t2} {model}"

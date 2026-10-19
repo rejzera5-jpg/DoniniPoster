@@ -125,13 +125,22 @@ def download_item(cfg, line, dest, shop, item, only_new=True, need_size=True, lo
         seen = _load_seen()
     if only_new and gid in seen:
         return {"ok": True, "skipped": True, "reason": "уже скачан"}
-    sizes = parse_sizes(text)
+    is_case = (line.get("template") == "phonecases")
+    models = []
+    if is_case:  # чехлы: вместо размера — модель телефона из описания
+        from .templates import parse_phone_models
+        models = parse_phone_models(text)
+        sizes, need_size = [], False
+    else:
+        sizes = parse_sizes(text)
     if need_size and not sizes:
         return {"ok": True, "skipped": True, "reason": "нет размера"}
 
     base = target_dir(cfg, line, dest, shop)
     base.mkdir(parents=True, exist_ok=True)
     name = product_name(text)
+    if is_case:
+        name = (", ".join(models) if models else "модель?") + " — " + name
     if sizes:
         name = f"{name} {' '.join(s.replace('*', 'x') for s in sizes)}"
     name = name[:110].strip()
@@ -161,6 +170,8 @@ def download_item(cfg, line, dest, shop, item, only_new=True, need_size=True, lo
         return {"ok": False, "error": "не скачалось ни одного фото" + (f" ({errors[0]})" if errors else "")}
     if sizes:
         (tmp / "info.txt").write_text("размер: " + "\\".join(sizes) + " cm\n", "utf-8")
+    if models:  # в объявлении будет «Model telefonu: iPhone 18 Pro Max» и модель в названии
+        (tmp / "info.txt").write_text("размер: " + ", ".join(models) + "\n", "utf-8")
     (tmp / "описание.txt").write_text(text, "utf-8")
     (tmp / ".ready").write_text("", "utf-8")
 
@@ -173,4 +184,5 @@ def download_item(cfg, line, dest, shop, item, only_new=True, need_size=True, lo
         seen[gid] = final.name
         _save_seen(seen)
     log(f"⬇ WeChat: «{final.name}» — фото {got}" + (f", не скачалось {len(errors)}" if errors else ""))
-    return {"ok": True, "folder": final.name, "size": "\\".join(sizes), "photos": got, "failed": len(errors)}
+    return {"ok": True, "folder": final.name, "size": ", ".join(models) if is_case else "\\".join(sizes),
+            "model": is_case, "photos": got, "failed": len(errors)}

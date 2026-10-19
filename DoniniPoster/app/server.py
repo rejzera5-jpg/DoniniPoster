@@ -323,6 +323,7 @@ def create_app(engine):
 
     # категория товара на сайте → вид товара в программе (с нужным шаблоном текста); нет такого — создаём
     AUTO_KINDS = [
+        (r"чехл|etui|\bcase|obudow", "phonecases", "Чехлы"),
         (r"кеп|czapk\w* z daszk|daszk|\bcap", "caps", "Кепки"),
         (r"галст|krawat|\btie", "ties", "Галстуки"),
         (r"кошел|portfel|portmon|wallet", "wallets", "Кошельки"),

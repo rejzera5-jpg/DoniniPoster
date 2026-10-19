@@ -1082,6 +1082,28 @@
     });
   }
 
+
+  // ---- Чехлы для телефонов: вместо размера — модель телефона (поле «Размер» = модель) ----
+  const CASE_DEFAULT_MODEL = "iPhone 18 Pro Max";
+  const caseModel = (s) => { const v = String(s ?? sizeInput.value ?? "").trim(); return v && !/\d\s*[*x×]\s*\d/.test(v) ? v : CASE_DEFAULT_MODEL; };
+  const fillCase = (tpl, b, m) => tpl.replace("@@B@@", b || "").replace("@@M@@", m || "").replace(/\s+/g, " ").trim();
+  const PHONECASES_RAW = [
+    { code: "HU", name: "Венгрия", tm: "@@B@@ Márkás telefontok @@M@@", tp: "@@B@@ Márkás telefontok", body: "Telefon típusa: @@M@@\nAnyag: kiváló minőségű anyag\nPontosan illeszkedik, védi a telefont az ütésektől és karcolásoktól\n\nA fotók valódiak!\n\nA minőség kiváló!\n\nAjándéknak is tökéletes!!!\n\nSzállítás 2–4 héten belül" },
+    { code: "DE", name: "Германия", tm: "Handyhülle @@M@@ @@B@@", tp: "Handyhülle @@B@@", body: "Passend für: @@M@@\nMaterial: hochwertiges Material\nPasst perfekt und schützt das Handy vor Stößen und Kratzern.\nLieferzeit: ca. 14 Tage.\nHervorragende Qualität.\nFotos vom tatsächlichen Produkt!\n\nZahlung per Nachnahme oder per Banküberweisung.\nIdeal als Geschenk!" },
+    { code: "PT", name: "Португалия", tm: "Capa para @@M@@ @@B@@", tp: "Capa para telemóvel @@B@@", body: "Compatível com: @@M@@\nMaterial: material de alta qualidade\nAjuste perfeito, protege o telemóvel contra quedas e riscos.\nPrazo de entrega: aproximadamente 14 dias.\nQualidade excelente.\nFotos do produto real!\nPagamento à cobrança ou por transferência bancária.\nIdeal para oferecer como presente!" },
+    { code: "ES", name: "Испания", tm: "Funda @@M@@ @@B@@", tp: "Funda de móvil @@B@@", body: "Compatible con: @@M@@\nMaterial: alta calidad\nAjuste perfecto, protege el móvil de golpes y arañazos\nEntrega: Aprox. 4-5 días\nExcelente calidad\n¡Foto real!\n\nEnvío a cualquier país." },
+    { code: "NL", name: "Нидерланды", tm: "Telefoonhoesje @@M@@ @@B@@", tp: "Telefoonhoesje @@B@@", body: "Geschikt voor: @@M@@\nMateriaal: hoogwaardig materiaal\nPast perfect en beschermt de telefoon tegen stoten en krassen.\nLevertijd: ongeveer 14 dagen.\nUitstekende kwaliteit.\nFoto's van het echte product!\n\nBetaling onder rembours of via bankoverschrijving.\nIdeaal als cadeau!" },
+    { code: "PL", name: "Польша", tm: "Etui @@M@@ @@B@@", tp: "Etui na telefon @@B@@", body: "Model telefonu: @@M@@\nMateriał: wysokiej jakości\nIdealnie dopasowane, chroni telefon przed uderzeniami i zarysowaniami.\nCzas dostawy: ok. 14 dni.\nDoskonała jakość.\nZdjęcia rzeczywistego produktu!\n\nPłatność za pobraniem lub przelewem.\nIdealny prezent!" },
+    { code: "RO", name: "Румыния", tm: "Husă @@M@@ @@B@@", tp: "Husă telefon @@B@@", body: "Compatibil cu: @@M@@\nMaterial: de calitate superioară\nSe potrivește perfect și protejează telefonul de lovituri și zgârieturi.\nTermen de livrare: aprox. 14 zile.\nCalitate excelentă.\nFotografii reale ale produsului!\n\nPlata ramburs sau prin transfer bancar.\nIdeal ca cadou!" },
+    { code: "HR", name: "Хорватия", tm: "Maska za @@M@@ @@B@@", tp: "Maska za mobitel @@B@@", body: "Za model: @@M@@\nMaterijal: kvalitetan materijal\nSavršeno pristaje i štiti mobitel od udaraca i ogrebotina.\nRok isporuke: oko 14 dana.\nOdlična kvaliteta.\nStvarne fotografije proizvoda!\n\nPlaćanje pouzećem ili bankovnim transferom.\nIdealno za poklon!" },
+    { code: "CZ", name: "Чехия", tm: "Pouzdro na @@M@@ @@B@@", tp: "Pouzdro na mobil @@B@@", body: "Pro model: @@M@@\nMateriál: kvalitní materiál\nPerfektně sedí a chrání telefon před nárazy a poškrábáním.\nDoba dodání: cca 14 dní.\nVynikající kvalita.\nSkutečné fotografie produktu!\n\nPlatba na dobírku nebo bankovním převodem.\nIdeální jako dárek!" },
+    { code: "AT", name: "Австрия", tm: "Handyhülle @@M@@ @@B@@", tp: "Handyhülle @@B@@", body: "Passend für: @@M@@\nMaterial: hochwertiges Material\nPasst perfekt und schützt das Handy vor Stößen und Kratzern.\nLieferzeit: ca. 14 Tage.\nHervorragende Qualität.\nFotos vom tatsächlichen Produkt!\n\nZahlung per Nachnahme oder per Banküberweisung.\nIdeal als Geschenk!" },
+    { code: "GR", name: "Греция", tm: "Θήκη κινητού @@M@@ @@B@@", tp: "Θήκη κινητού @@B@@", body: "Συμβατό με: @@M@@\nΥλικό: υψηλής ποιότητας υλικό\nΤέλεια εφαρμογή, προστατεύει το κινητό από χτυπήματα και γρατζουνιές.\nΧρόνος παράδοσης: περίπου 14 ημέρες.\nΕξαιρετική ποιότητα.\nΠραγματικές φωτογραφίες του προϊόντος!\n\nΠληρωμή με αντικαταβολή ή με τραπεζική μεταφορά.\nΙδανικό για δώρο!" },
+    { code: "BE", name: "Бельгия", tm: "Telefoonhoesje @@M@@ @@B@@", tp: "Telefoonhoesje @@B@@", body: "Geschikt voor: @@M@@\nMateriaal: hoogwaardig materiaal\nPast perfect en beschermt de telefoon tegen stoten en krassen.\nLevertijd: ongeveer 14 dagen.\nUitstekende kwaliteit.\nFoto's van het echte product!\n\nBetaling onder rembours of via bankoverschrijving.\nIdeaal als cadeau!" }
+  ];
+  const PHONECASES_LANGS = PHONECASES_RAW.map(r => ({ code: r.code, name: r.name,
+    title: (b) => fillCase(r.tm, b, caseModel()),
+    body: (s) => r.body.replace("@@M@@", caseModel(s)) }));
   const BUILT_IN_TYPES = [
     { id: "bags", label: "Сумки", langs: BAGS_LANGS },
     { id: "wallets", label: TYPE_LABELS.wallets, langs: buildTypeLangs("wallets") },
@@ -1093,8 +1115,20 @@
     { id: "shoes", label: TYPE_LABELS.shoes, langs: buildTypeLangs("shoes") },
     { id: "swimsuits", label: TYPE_LABELS.swimsuits, langs: buildTypeLangs("swimsuits") },
     { id: "downjackets", label: TYPE_LABELS.downjackets, langs: buildTypeLangs("downjackets") },
-    { id: "caps", label: TYPE_LABELS.caps, langs: buildTypeLangs("caps") }
+    { id: "caps", label: TYPE_LABELS.caps, langs: buildTypeLangs("caps") },
+    { id: "phonecases", label: "Чехлы", langs: PHONECASES_LANGS }
   ];
+  // у чехлов поле «Размер» — это модель телефона
+  setInterval(() => {
+    const lab = document.querySelector('label[for="size"]');
+    if (!lab) return;
+    const isCase = currentTypeId === "phonecases";
+    const want = isCase ? "Модель телефона" : "Размер";
+    if (lab.textContent !== want) {
+      lab.textContent = want;
+      if (isCase && /\d\s*[*x×]\s*\d/.test(sizeInput.value)) { sizeInput.value = CASE_DEFAULT_MODEL; sizeInput.dispatchEvent(new Event("input", { bubbles: true })); }
+    }
+  }, 400);
 
   function customTypeToRuntime(ct){
     return {

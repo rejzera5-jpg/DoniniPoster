@@ -851,7 +851,7 @@ function renderQueue(siteMode){
   const tplBar = usedLines.length ? `<div class="tplbar"><span class="small muted">Шаблон текста:</span>${usedLines.map(l => `<span class="tplitem"><b>${esc(l.name)}</b>
       <select data-linetpl="${esc(l.id)}" title="Шаблон текста для всех товаров «${esc(l.name)}»">${tplOpts(l.template)}</select>
       <button class="sm" data-mgrtpl="${esc(l.template)}" title="Открыть этот шаблон в Donini Manager и поправить текст">✏️</button></span>`).join("")}</div>` : "";
-  setHTML(box, `${tplBar}${rows.length > 300 ? `<div class="small muted" style="margin-bottom:6px">Показаны первые 300 из ${rows.length}</div>` : ""}<table><thead><tr><th style="width:26px"><input type="checkbox" data-selall="${siteMode ? 1 : 0}" ${allSel ? "checked" : ""} title="Выбрать все. Подсказка: отметьте один товар, потом с Shift — другой: выберутся все между ними"></th><th></th><th>Код</th><th>Товар</th><th>Размер</th><th>Цена, зл</th><th>Сайты</th><th></th></tr></thead><tbody>${
+  setHTML(box, `${tplBar}${rows.length > 300 ? `<div class="small muted" style="margin-bottom:6px">Показаны первые 300 из ${rows.length}</div>` : ""}<table><thead><tr><th style="width:26px"><input type="checkbox" data-selall="${siteMode ? 1 : 0}" ${allSel ? "checked" : ""} title="Выбрать все. Подсказка: отметьте один товар, потом с Shift — другой: выберутся все между ними"></th><th></th><th>Код</th><th>Товар</th><th>Размер / модель</th><th>Цена, зл</th><th>Сайты</th><th></th></tr></thead><tbody>${
     shown.map(p => {
       const chips = Object.entries(p.sites).map(([sid, st]) => {
         const name = sites[sid] ? sites[sid].name.replace(/\s*\(.*\)/, "") : sid;
@@ -2018,7 +2018,7 @@ async function cardModal(pid){
         <label class="field">Бренд ${d.brand_manual ? "" : `<span class="muted">(найден автоматически)</span>`}<input id="cdBrand" value="${esc(d.brand)}"></label>
         <label class="switch small"><input type="checkbox" id="cdWithBrand" ${d.no_brand ? "" : "checked"}> выгружать с брендом <span class="muted">(снять — бренд не пишется нигде)</span></label>
         <div class="row">
-          <label class="field" style="flex:1">Размер<input id="cdSize" value="${esc(d.size)}"></label>
+          <label class="field" style="flex:1">${(d.lines.find(l => l.id === d.line) || {}).template === "phonecases" || d.template === "phonecases" ? "📱 Модель телефона (например iPhone 18 Pro Max)" : "Размер"}<input id="cdSize" value="${esc(d.size)}"></label>
           <label class="field">Цена, зл<input id="cdPrice" class="mini" value="${esc(d.price ?? "")}"></label>
         </div>
         <div class="field">Сайты для этого товара

@@ -127,6 +127,13 @@ def load_config():
                                  "default_price": base.get("default_price", 0), "sites": ["doninisklep"], "counter": 0})
             cfg["_site_line_added"] = True
             save_config(cfg)
+        # чехлы для телефонов — своя вкладка очереди со своим шаблоном (модель телефона вместо размера)
+        if not cfg.get("_cases_line_added") and not any(l.get("template") == "phonecases" for l in cfg["lines"]):
+            w = next((l for l in cfg["lines"] if l.get("template") == "wallets"), {})
+            cfg["lines"].append({"id": "cases", "name": "Чехлы", "folder": "Чехлы", "template": "phonecases",
+                                 "default_size": "", "default_price": 0, "sites": list(w.get("sites") or []), "counter": 0})
+            cfg["_cases_line_added"] = True
+            save_config(cfg)
         # очередь сайта — отдельная папка «Очередь сайта» рядом с «Очередь», чтобы не путать с досками
         site_dir = str(ROOT / "Очередь сайта")
         for l in cfg["lines"]:
