@@ -131,8 +131,15 @@ def load_config():
         if not cfg.get("_cases_line_added") and not any(l.get("template") == "phonecases" for l in cfg["lines"]):
             w = next((l for l in cfg["lines"] if l.get("template") == "wallets"), {})
             cfg["lines"].append({"id": "cases", "name": "Чехлы", "folder": "Чехлы", "template": "phonecases",
-                                 "default_size": "", "default_price": 0, "sites": list(w.get("sites") or []), "counter": 0})
+                                 "default_size": "", "default_price": 399, "sites": list(w.get("sites") or []), "counter": 0})
             cfg["_cases_line_added"] = True
+            save_config(cfg)
+        # цена чехлов по умолчанию — 399 зл (один раз; дальше её можно менять в настройках вида товара)
+        if not cfg.get("_cases_price_set"):
+            for l in cfg["lines"]:
+                if l.get("template") == "phonecases" and not l.get("default_price"):
+                    l["default_price"] = 399
+            cfg["_cases_price_set"] = True
             save_config(cfg)
         # очередь сайта — отдельная папка «Очередь сайта» рядом с «Очередь», чтобы не путать с досками
         site_dir = str(ROOT / "Очередь сайта")
