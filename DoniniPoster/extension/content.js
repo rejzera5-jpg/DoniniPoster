@@ -1793,10 +1793,10 @@
       button.s{background:#5a4a3c}
       .r{margin-top:6px}
     </style><div class="c">⬇ Donini — в очередь. Вид товара:<select id="line"><option>…</option></select>
-      <div class="r">Один товар: наведите на его фото → «В очередь».</div>
+      <div class="r">Один товар: наведите на любое его фото → «Товар в очередь» — скачаются ВСЕ фото поста.</div>
       <div class="r"><span id="tagLbl">Целиком раздел:</span> <select id="tag" style="max-width:170px"><option value="">весь альбом</option></select><br>
         Только со словами: <input id="words" placeholder="например 手机壳, iphone" style="width:150px;background:#2b221b;color:#f1e9dd;border:1px solid #5a4a3c;border-radius:6px;padding:2px 4px"><br>
-        <button id="all">⬇ Весь раздел в очередь</button> <button id="stopAll" class="s" style="display:none">Стоп</button></div>
+        <button id="all">⬇ Всё сразу в очередь</button> <button id="stopAll" class="s" style="display:none">Стоп</button></div>
       <div class="m" id="msg"></div></div>`;
     const $ = (id) => root.getElementById(id);
     const say = (t) => { $("msg").textContent = t; };
@@ -1935,6 +1935,7 @@
     btn.textContent = "⬇ В очередь";
     document.documentElement.appendChild(btn);
     let target = null, hideT = null, busy = false;
+    const phCount = new WeakMap();
     const imgUrlOf = (el) => {
       if (!el || el.nodeType !== 1) return null;
       if (el.tagName === "IMG" && isProductImg(el.currentSrc || el.src)) return el.currentSrc || el.src;
@@ -1954,8 +1955,14 @@
       clearTimeout(hideT);
       if (!document.documentElement.contains(btn)) document.documentElement.appendChild(btn);
       target = { el, url };
-      btn.textContent = "⬇ В очередь";
-      btn.style.left = Math.max(4, r.right - 118) + "px";
+      // сколько фото у этого товара (весь пост, а не одно фото) — видно сразу на кнопке
+      let nph = 0;
+      try {
+        if (!phCount.has(el)) { const c = el.tagName === "IMG" ? cardOf(el) : null; phCount.set(el, c ? c.imgs.length : 0); }
+        nph = phCount.get(el);
+      } catch (e) {}
+      btn.textContent = nph > 1 ? `⬇ Товар в очередь (${nph} фото)` : "⬇ Товар в очередь";
+      btn.style.left = Math.max(4, r.right - 190) + "px";
       btn.style.top = Math.max(4, r.top + 6) + "px";
       btn.style.display = "";
     }, true);
