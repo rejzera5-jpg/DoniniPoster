@@ -2003,11 +2003,18 @@
     }
     // запасной путь (лента «相册动态», просмотр фото): карточка поста на странице — текст + все его фото
     function cardOf(img) {
-      let card = img.parentElement;
-      for (let k = 0; k < 10 && card && card !== document.body; k++, card = card.parentElement) {
+      // поднимаемся до блока поста: в нём текст описания и ВСЕ фото поста. Надпись поверх одного фото
+      // (водяной знак, «商品属性») — ещё не пост: идём выше, пока фото больше одного; но не до соседних постов
+      const nImg = (e) => [...e.querySelectorAll("img")].filter((i) => isProductImg(i.currentSrc || i.src)).length;
+      let card = img.parentElement, firstText = null, prev = img;
+      for (let k = 0; k < 14 && card && card !== document.body; k++, prev = card, card = card.parentElement) {
+        if (nImg(card) > 12) { card = firstText || prev; break; }  // поднялись до списка постов — назад
         const t = (card.innerText || "").trim();
-        if (t.length >= 6 && card.querySelectorAll("img").length >= 1) break;
+        if (t.length >= 6 && !firstText) firstText = card;
+        if (t.length >= 6 && nImg(card) >= 2) break;
+        if (/goods-item|search_goods|item-wrap|moment/i.test(String(card.className || "")) && nImg(card) >= 1) break;
       }
+      if (!card || card === document.body) card = firstText;
       if (!card || card === document.body) return null;
       const imgs = [];
       for (const i of card.querySelectorAll("img")) { const u = i.currentSrc || i.src; if (isProductImg(u) && !imgs.includes(cleanUrl(u))) imgs.push(cleanUrl(u)); }
