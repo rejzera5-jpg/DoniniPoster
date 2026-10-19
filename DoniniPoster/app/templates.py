@@ -149,7 +149,13 @@ def norm(num, suf):
 
 LIST_RE = re.compile(r"(?<![\d.])((?:1[0-9]|20)(?:\s*[/、,，|]\s*(?:1[0-9]|20))+)\s*" + SUF + r"(?![\d*xX×.])", re.I)
 
+_SKIP_LINE = re.compile(r"定制|无做|不做|没有|不退|系列")
+
+
 def parse_phone_models(text):
+    # строки «需定制型号（15/14…）» (под заказ), «无做14plus» (нет), «iPhone18系列更新» (заголовок) — не модели в наличии
+    lines = [ln for ln in (text or "").splitlines() if not _SKIP_LINE.search(ln)]
+    text = "\n".join(lines)
     out = []
     for m in LIST_RE.finditer(text or ""):
         for n in re.findall(r"\d+", m.group(1)):
@@ -171,7 +177,30 @@ def parse_phone_models(text):
 
 
 def phone_models_text(text):
-    return ", ".join(parse_phone_models(text))
+    """«iPhone 18 Pro Max, 18 Pro, 18, 17 Pro Max» — компактно для описания."""
+    return compact_models(parse_phone_models(text))
+
+
+def compact_models(models):
+    out = []
+    for i, m in enumerate(models):
+        out.append(m if i == 0 else m.replace("iPhone ", "", 1))
+    return ", ".join(out)
+
+
+def short_models(model_text):
+    """Для названия: одна модель — целиком («iPhone 18 Pro Max»), несколько — поколения («iPhone 18 / 17 / 16»)."""
+    t = (model_text or "").strip()
+    if not t or ("," not in t and "/" not in t):
+        return t
+    nums = []
+    for part in re.split(r"[,/]", t):
+        m = re.match(r"\s*(?:iPhone\s*)?(\d{1,2}|XR|XS|X|SE)\b", part.strip(), re.I)
+        if m:
+            n = m.group(1).upper()
+            if n not in nums:
+                nums.append(n)
+    return "iPhone " + " / ".join(nums) if nums else t
 
 
 def _case(m_title, plain, label, body_rest):
@@ -331,7 +360,7 @@ def build_texts(type_id, lang, size, code, brand="", custom=None):
                 text = text.replace(old_size, size)
         body = text
     if type_id == "phonecases":
-        title = _case_title_model(title, size, code)
+        title = _case_title_model(title, short_models(size), code)
     if not (size or "").strip():
         # размера нет — строку «Rozmiar: …» убираем совсем (иначе в объявлении остался бы размер из шаблона)
         body = SIZE_LINE_DROP_RE.sub("", body).lstrip("\n")
@@ -342,7 +371,7 @@ def _build_texts_base(type_id, lang, size, code, brand="", custom=None):
     custom = custom or []
     if type_id in BUILT_IN:
         t = BUILT_IN[type_id][lang]
-        title = t["title_m"](brand, size) if "title_m" in t else t["title"](brand)
+        title = t["title_m"](brand, short_models(size)) if "title_m" in t else t["title"](brand)
         body = t["body"](size)
     else:
         ct = next((c for c in custom if c["id"] == type_id), None)
@@ -370,7 +399,7 @@ def _case_title_model(title, model, code):
     """Чехлы: в названии должна стоять модель этого товара. Если название поправлено в Donini Manager
     с моделью-примером («Etui iPhone 17 Pro») — модель-пример меняется на модель товара."""
     model = (model or "").strip()
-    if not model:
+    if not model or model.lower() in (title or "").lower():
         return title
     first = [True]
 

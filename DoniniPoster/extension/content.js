@@ -1715,9 +1715,23 @@
     };
     // лента «相册动态» (посты всех поставщиков, на которых вы подписаны) — у неё свой список и нет разделов
     const isFeed = () => /#\/album_home/.test(location.hash) || (/link_type=pc_home/.test(location.search) && !/(shop_detail|theme_detail)\//.test(location.hash));
-    const modeKey = () => (isFeed() ? "feed|" : "album|") + (shopId() || "");
+    // что вписано в строку поиска самого сайта (в ленте) — по нему ищем товар под мышкой
+    const siteSearch = () => { try { const i = [...document.querySelectorAll("input")].find((x) => x.offsetParent && x.value && !(x.getRootNode() instanceof ShadowRoot)); return i ? i.value.trim() : ""; } catch (e) { return ""; } };
+    const modeKey = () => (isFeed() ? "feed" + siteSearch() + "|" : "album|") + (shopId() || "");
+    const _unusedModeKey = () => (isFeed() ? "feed|" : "album|") + (shopId() || "");
     // одна страница товаров: из альбома поставщика или из ленты
-    async function fetchPage(sid, ts, tag) {
+    async function fetchPage(sid, ts, tag, search, pageNo) {
+      if (isFeed() && search) {
+        // поиск по ленте (как строка поиска на сайте) — находит и старые посты, до которых лента не листается
+        const body = `searchValue=${encodeURIComponent(search)}&searchImg=&noCache=0&timestamp=${ts && ts !== -1 ? ts : ""}&loadMoreType=&searchQuerySource=0&requestDataType=itemName&digitalWatermarkId=&page=${pageNo || 1}&sort=%7B%22type%22%3A%22updateTime%22%7D`;
+        const j = await (await fetch("/commoditysearch/api/v3/search/moments?", { method: "POST", credentials: "include", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body })).json();
+        let items = (j.result && j.result.items) || [];
+        const raw = items;
+        if (tag && String(tag).startsWith("shop:")) { const want = String(tag).slice(5); items = items.filter((x) => x.shop_id === want || x.parent_shop_id === want); }
+        const pg = (j.result && j.result.pagination) || {};
+        if (!pg.pageTimestamp && raw.length) pg.pageTimestamp = raw[raw.length - 1].time_stamp;
+        return { items, raw, pg };
+      }
       if (isFeed()) {
         const q = new URLSearchParams(location.search);
         const base = `/album/moments?searchValue=&searchImg=&noCache=0&requestDataType=&link_type=${encodeURIComponent(q.get("link_type") || "pc_home")}&shop_id=${encodeURIComponent(q.get("shop_id") || "")}&shop_name=${encodeURIComponent(q.get("shop_name") || "")}`;
@@ -1878,7 +1892,7 @@
       let filtered = 0;
       try {
         for (let pages = 0; pages < 500 && !allStop; pages++) {
-          const { items, raw, pg } = await fetchPage(sid, ts, tag);
+          const { items, raw, pg } = await fetchPage(sid, ts, tag, isFeed() ? words[0] : "", pages + 1);
           if (!raw.length) break;
           addItems(raw);
           for (const it of items) {
@@ -1970,7 +1984,7 @@
         btn.textContent = `⏳ ищу товар… (${p * 32})`;
         let items = [], pg = null;
         try {
-          const r = await fetchPage(sid, apiTs, isFeed() ? "" : tag);
+          const r = await fetchPage(sid, apiTs, isFeed() ? "" : tag, isFeed() ? siteSearch() : "", p + 1);
           items = r.raw; pg = r.pg;
         } catch (e) { break; }
         addItems(items);
