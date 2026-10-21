@@ -204,9 +204,15 @@ function scheduleAutoCheck(ms = 2500) {
 async function getBatch() { const { batch = null } = await chrome.storage.local.get("batch"); return batch; }
 async function setBatch(b) { await chrome.storage.local.set({ batch: b }); }
 
+// товары, которые сейчас открыты в другой вкладке (авто-режим или пачка) — второй раз не берём, чтобы не было дублей
+async function busyProducts() {
+  const { jobs } = await getState();
+  return new Set(Object.values(jobs).filter((j) => j && !FINISHED.includes(j.status)).map((j) => j.pid));
+}
 async function batchPickNext(b) {
   const st = await api("/api/ext/state");
-  return (st.products || []).find((p) => p.line === b.line && !(b.tried || []).includes(p.id) && p.sites.some((x) => x.id === b.site)) || null;
+  const busy = await busyProducts();
+  return (st.products || []).find((p) => p.line === b.line && !busy.has(p.id) && !(b.tried || []).includes(p.id) && p.sites.some((x) => x.id === b.site)) || null;
 }
 async function batchOpen(b, p, tabId) {
   const job = await api(`/api/ext/job?pid=${encodeURIComponent(p.id)}&sites=${encodeURIComponent(b.site)}`);
@@ -335,7 +341,8 @@ async function autoCheck() {
   const queueWait = a.queueUntil && Date.now() < a.queueUntil;
   // исправление начинаем, только если оно успеет закончиться до следующего товара очереди — очередь не задерживаем
   const editFits = !queueWait || Date.now() + Math.min(30000, a.editDur || 18000) + 2000 <= a.queueUntil;
-  const fresh = (st.products || []).filter((p) => !(a.tried || []).includes(p.id));
+  const busyNow = await busyProducts();
+  const fresh = (st.products || []).filter((p) => !(a.tried || []).includes(p.id) && !busyNow.has(p.id));
   const firstEdit = fresh.find((p) => p.edit);
   let next = null, nextSites = [];
   if (queueWait) {
