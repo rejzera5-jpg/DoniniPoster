@@ -1043,6 +1043,28 @@
           return;
         }
         if (st.action === "wait") { await sleep(st.ms || 1000); await bg({ type: "setIdx", idx: i + 1 }); continue; }
+        // «Встряхнуть» фото: некоторые сайты (Milanuncios) после загрузки не включают кнопку «Continuar».
+        // Удаляем последнее фото и загружаем его снова — сайт пересчитывает фото, кнопка загорается.
+        if (st.action === "photoNudge") {
+          status("Обновляю фото (удаляю и снова добавляю последнее), чтобы сайт включил кнопку…");
+          const RM = /elimin|borrar|quitar|delete|remove|usuń|usun|törl|smazat|odstran|izbri|retirer|supprimer|entfernen|löschen/i;
+          const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 4 && r.height > 4; };
+          const lab = (e) => [e.getAttribute("aria-label"), e.getAttribute("title"), e.getAttribute("data-testid"), e.className && String(e.className.baseVal ?? e.className)].join(" ");
+          let rms = qsaDeep('button, [role="button"], a, span, div, svg').filter((e) => !isPanel(e) && vis(e) && (RM.test(lab(e)) || /^[×✕✖x]$/i.test(cleanText(e.innerText || ""))));
+          // только кнопки рядом с фото товара
+          rms = rms.filter((e) => { let b = e; for (let k = 0; k < 5 && b; k++, b = b.parentElement) if (b.querySelector && b.querySelector("img")) return true; return false; });
+          // самые «внутренние» (не обёртки)
+          rms = rms.filter((e) => !rms.some((o) => o !== e && e.contains(o)));
+          if (rms.length) {
+            clickEl(clickable(rms[rms.length - 1]) || rms[rms.length - 1]);
+            await sleep(st.ms || 2500);
+            files = files || toFiles(await bg({ type: "photos", urls: job.photos }));
+            const inp = findFileInput(document.body);
+            if (inp && files.length) { putFiles(inp, [files[files.length - 1]]); await sleep(4000); }
+          } else status("Кнопку удаления фото не нашёл — продолжаю как есть.");
+          await bg({ type: "setIdx", idx: i + 1 });
+          continue;
+        }
         // выбор пункта в обычном списке <select> по ТЕКСТУ (номер списка — index), например категория на Jófogás,
         // если сайт сам её не предложил. onlyIfEmpty — только если в списке ещё ничего не выбрано.
         if (st.action === "selectText") {
