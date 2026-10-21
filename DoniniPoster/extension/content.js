@@ -1381,7 +1381,7 @@
           files = files || toFiles(await bg({ type: "photos", urls: job.photos }));
           const n = await uploadFiles(el, files);
           const olx = /(^|\.)olx\.(pl|pt|ro|bg|ua|kz|uz)$/.test(location.hostname);
-          if (!olx) await sleep(2000 + n * 600); // OLX: сразу следим за загрузкой, без лишнего ожидания
+          if (!olx && !st.fast) await sleep(2000 + n * 600); // OLX: сразу следим за загрузкой, без лишнего ожидания; fast — пауза задана в сценарии
           if (st.waitUpload || /(^|\.)vatera\.hu$/.test(location.hostname)) await waitUploadsDone(n, i);
           await waitSiteAutofill(i, n);
         }
