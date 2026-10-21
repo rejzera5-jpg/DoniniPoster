@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Donini Poster",
-  "version": "3.66",
+  "version": "3.67",
   "description": "Заполняет объявления на сайтах из очереди программы Donini Poster — в вашем браузере, где вы уже вошли в аккаунты. Публикуете вы сами.",
   "permissions": [
     "storage",

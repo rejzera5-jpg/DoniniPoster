@@ -1055,6 +1055,21 @@
           rms = rms.filter((e) => { let b = e; for (let k = 0; k < 5 && b; k++, b = b.parentElement) if (b.querySelector && b.querySelector("img")) return true; return false; });
           // самые «внутренние» (не обёртки)
           rms = rms.filter((e) => !rms.some((o) => o !== e && e.contains(o)));
+          if (!rms.length) {
+            // кнопки-иконки без подписи (корзина 🗑 под фото, как на Milanuncios): у карточки фото берём
+            // первую кнопку-иконку, не «повернуть»
+            const ROT = /gir|rota|rotat|obr|turn|drehen/i;
+            const imgs = qsaDeep("img").filter((im) => !isPanel(im) && vis(im) && im.getBoundingClientRect().width >= 60);
+            const cards = [];
+            for (const im of imgs) {
+              let c = im.parentElement;
+              for (let k = 0; k < 6 && c; k++, c = c.parentElement) {
+                const bs = [...c.querySelectorAll('button, [role="button"]')].filter((b) => vis(b) && !cleanText(b.innerText || "") && !ROT.test(lab(b)));
+                if (bs.length) { cards.push(bs[0]); break; }
+              }
+            }
+            if (cards.length) rms = [cards[cards.length - 1]];
+          }
           if (rms.length) {
             clickEl(clickable(rms[rms.length - 1]) || rms[rms.length - 1]);
             await sleep(st.ms || 2500);
