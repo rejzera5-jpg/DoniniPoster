@@ -1146,6 +1146,20 @@ def create_app(engine):
         exact_first = [h for h in hits if h["_exact"]] + sorted([h for h in hits if not h["_exact"]], key=lambda h: h["added"] or "", reverse=True)
         return {"items": exact_first[:30], "total": len(hits)}
 
+    @app.post("/api/line/{lid}/pause")
+    async def line_pause(lid: str, req: Request):
+        """Включить / выключить очередь (вид товара) для выгрузки на доски."""
+        d = await req.json()
+        cfg = C.load_config()
+        ln = next((l for l in cfg["lines"] if l["id"] == lid), None)
+        if not ln:
+            raise HTTPException(404, "Нет такого вида товара")
+        ln["paused"] = bool(d.get("paused"))
+        C.save_config(cfg)
+        engine.cfg = C.load_config()
+        engine.log(f"{'⏸' if ln['paused'] else '▶'} Очередь «{ln['name']}»: {'выключена — не выставляется' if ln['paused'] else 'включена для выставления'}")
+        return {"ok": True, "paused": ln["paused"]}
+
     @app.post("/api/line/{lid}/template")
     async def line_template(lid: str, req: Request):
         from .templates import list_types
@@ -1728,12 +1742,16 @@ def create_app(engine):
         return {k: ad.get(k, "") for k in ("title", "body", "price", "currency", "size", "code", "brand")}
 
     @app.get("/api/ext/state")
-    async def ext_state():
+    async def ext_state(all: int = 0):
         sites = ext_sites()
         ids = {s["id"]: s for s in sites}
         all_ids = {s["id"]: s for s in C.load_sites() if s.get("type") in ("ext", "manual")}
+        # очереди, выключенные для выгрузки (кнопка на плитке очереди) — авто-режим их не берёт; пачка (all=1) — берёт
+        off_lines = set() if all else {l["id"] for l in engine.cfg["lines"] if l.get("paused")}
         prods, noprice = [], []
         for p in sorted(engine.state["products"].values(), key=lambda x: x["added"]):
+            if p.get("line") in off_lines and p["status"] != "archived":
+                continue
             edit_only = p["status"] == "archived"
             if edit_only and (engine.cfg.get("edit_paused") or not any(st.get("edit") for st in p["sites"].values())):
                 continue

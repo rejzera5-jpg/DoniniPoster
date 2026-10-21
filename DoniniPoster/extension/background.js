@@ -220,7 +220,7 @@ async function busyProducts() {
   return new Set(Object.values(jobs).filter((j) => j && !FINISHED.includes(j.status)).map((j) => j.pid));
 }
 async function batchPickNext(b) {
-  const st = await api("/api/ext/state");
+  const st = await api("/api/ext/state?all=1");  // пачка берёт и выключенные очереди — вид товара вы выбрали сами
   const busy = await busyProducts();
   return (st.products || []).find((p) => p.line === b.line && !busy.has(p.id) && !(b.tried || []).includes(p.id) && p.sites.some((x) => x.id === b.site)) || null;
 }

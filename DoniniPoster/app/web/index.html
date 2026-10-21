@@ -1552,7 +1552,9 @@ function renderDrops(){
       const n = act.filter(p => p.line === l.id).length, u = UP[l.id];
       return `<div class="drop" data-line="${esc(l.id)}"><span class="ic">${LINE_IC(l)}</span><b>${esc(l.id === "site" ? "Мой сайт" : l.name)}</b>
         <div class="q">в очереди: ${n}</div>
-        ${l.id !== "site" && n ? `<button class="sm ${EXT.auto && EXT.auto.line === l.id ? "stop" : "go"}" data-autoline="${esc(l.id)}" style="margin-top:6px" title="Выставлять подряд только эту очередь">${EXT.auto && EXT.auto.line === l.id ? "■ Идёт — стоп" : "▶ Выставлять"}</button>` : ""}
+        ${l.id !== "site" ? `<label class="switch small" data-linepause="${esc(l.id)}" style="justify-content:center;margin-top:6px" title="Выключенная очередь не выставляется в авто-режиме («Выставлять подряд», «без меня»)">
+          <input type="checkbox" ${l.paused ? "" : "checked"}> ${l.paused ? `<span class="warn">⏸ выключена</span>` : `<span class="ok">в выгрузке</span>`}</label>` : ""}
+        ${l.id !== "site" && n && !l.paused ? `<button class="sm ${EXT.auto && EXT.auto.line === l.id ? "stop" : "go"}" data-autoline="${esc(l.id)}" style="margin-top:6px" title="Выставлять подряд только эту очередь">${EXT.auto && EXT.auto.line === l.id ? "■ Идёт — стоп" : "▶ Выставлять"}</button>` : ""}
         ${u && u.total && u.done < u.total ? `<div class="prog"><i style="width:${Math.round(u.done / u.total * 100)}%"></i></div><div class="q">загружаю ${u.done} из ${u.total} фото…</div>` : ""}
         ${u && u.msg ? `<div class="msg ${u.err ? "e" : ""}">${esc(u.msg)}</div>` : ""}</div>`;
     }).join(""));
@@ -1608,7 +1610,16 @@ document.addEventListener("drop", async e => {
   uploadTo(d.dataset.line, items);
 });
 let pickLine = null;
-document.addEventListener("click", e => { const ab = e.target.closest("[data-autoline]"); if(ab){ e.stopPropagation(); autoStartLine(ab.dataset.autoline); return; } const d = e.target.closest(".drop"); if(!d) return; pickLine = d.dataset.line; $("#dirPick").value = ""; $("#dirPick").click(); });
+document.addEventListener("click", async e => {
+  const lp = e.target.closest("[data-linepause]");
+  if(lp){ e.stopPropagation(); if(e.target.tagName !== "INPUT") return;  // клик по подписи сам переключит галочку
+    const lid = lp.dataset.linepause, paused = !e.target.checked;
+    await post(`/api/line/${encodeURIComponent(lid)}/pause`, {paused});
+    const l = S.lines.find(x => x.id === lid); if(l) l.paused = paused;
+    toast(paused ? `⏸ Очередь «${l ? l.name : lid}» выключена — авто-режим её не берёт` : `▶ Очередь «${l ? l.name : lid}» включена`);
+    await refresh(); return; }
+}, true);
+document.addEventListener("click", e => { const ab = e.target.closest("[data-autoline]"); if(ab){ e.stopPropagation(); autoStartLine(ab.dataset.autoline); return; } if(e.target.closest("[data-linepause]")) return; const d = e.target.closest(".drop"); if(!d) return; pickLine = d.dataset.line; $("#dirPick").value = ""; $("#dirPick").click(); });
 $("#dirPick").onchange = (e) => {
   const files = [...e.target.files].map(f => ({file: f, rel: f.webkitRelativePath || f.name}));
   if(pickLine && files.length) uploadTo(pickLine, files);
