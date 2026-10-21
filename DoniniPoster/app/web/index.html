@@ -1689,7 +1689,20 @@ function catRender(){
         CAT_DONE[p.id] && Date.now() - CAT_DONE[p.id].t < 4000 ? `<div class="ov ok">✓ Добавлено<br>в «${esc(CAT_DONE[p.id].line)}»</div>` :
         CAT_FAIL[p.id] ? `<div class="ov err">⚠️ Не скачалось<br><span style="font-weight:400">нажмите ещё раз</span></div>` : ""}
       <div class="pi"><b>${esc(p.brand || "")}</b>${esc(p.size || "")}<br><span class="muted">${p.price ? esc(p.price) + " zł · " : ""}${p.photos} фото${p.sku ? " · " + esc(p.sku) : ""}</span></div></div>`).join("")
-    : `<div class="empty">Ничего не найдено</div>`;
+    : catEmptyMsg();
+}
+// пусто из-за фильтров — говорим, какой фильтр мешает, и даём сбросить одной кнопкой
+function catEmptyMsg(){
+  const br = $("#catBrand").value ? $("#catBrand").selectedOptions[0].textContent.replace(/\s*\(\d+\)$/, "") : "";
+  const se = $("#catSearch").value.trim();
+  const hide = $("#catHide").checked && CAT.items.length;
+  const why = [];
+  if(br) why.push(`бренд «${esc(br)}»`);
+  if(se) why.push(`поиск «${esc(se)}»`);
+  if(hide) why.push(`все найденные уже в очереди (снята галочка «скрыть» — покажет их)`);
+  if(!why.length) return `<div class="empty">В этой категории товаров нет</div>`;
+  return `<div class="empty">Ничего не найдено: в этой категории нет товаров с фильтром — ${why.join(", ")}.<br>
+    <button class="sm" style="margin-top:8px" onclick="$('#catBrand').value='';$('#catSearch').value='';$('#catHide').checked=false;catLoad(true)">✕ Сбросить фильтры</button></div>`;
 }
 async function catPull(ids){
   ids = ids.filter(id => !CAT.running.has(id));
