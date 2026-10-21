@@ -177,13 +177,23 @@ async function getAuto() { const { auto = null } = await chrome.storage.local.ge
 async function setAuto(a) { await chrome.storage.local.set({ auto: a }); }
 const FINISHED = ["done", "skipped", "error"];
 
-async function autoStart(pid, sites) {
-  const r = await startProduct(pid, sites);
+async function autoStart(pid, sites, line, lineName, allSites) {
+  const r = await startProduct(pid, sites);  // первый товар — только на его сайты, где он ещё не выставлен
   if (!r || !r.ok) return r;
-  await setAuto({ on: true, sites, pid, winId: r.winId, tried: [pid], count: 1, started: Date.now() });
-  await statsReset("выставлять подряд");
-  log("▶ Авто-режим: товары будут открываться подряд");
+  await setAuto({ on: true, sites: allSites && allSites.length ? allSites : sites, pid, winId: r.winId, tried: [pid], count: 1, started: Date.now(), line: line || "", lineName: lineName || "" });
+  await statsReset("выставлять подряд" + (lineName ? ` (${lineName})` : ""));
+  log("▶ Авто-режим: товары будут открываться подряд" + (lineName ? ` — только «${lineName}»` : ""));
   return r;
+}
+// переключить идущий авто-режим на другую очередь (вид товара) — без остановки
+async function autoSetLine(line, lineName, sites) {
+  const a = await getAuto();
+  if (!a || !a.on) return { ok: false, error: "авто-режим не запущен" };
+  a.line = line || ""; a.lineName = lineName || "";
+  if (sites && sites.length) a.sites = sites;
+  await setAuto(a);
+  log(`▶ Авто-режим: теперь ${lineName ? `только «${lineName}»` : "все очереди"}`);
+  return { ok: true };
 }
 async function autoStop(reason) {
   const a = await getAuto();
@@ -351,6 +361,7 @@ async function autoCheck() {
     // сначала товары, которые ждут ВСЕ выбранные сайты; недоделанные (уже выставлены на части сайтов) — в конце
     for (const p of fresh) {
       if (p.edit) continue;
+      if (a.line && p.line !== a.line) continue;  // авто-режим только по выбранной очереди
       const ids = p.sites.map((x) => x.id).filter((id) => !a.sites || !a.sites.length || a.sites.includes(id));
       if (ids.length > nextSites.length) { next = p; nextSites = ids; }
       if (a.sites && ids.length >= a.sites.length) break; // полный товар — берём сразу
@@ -684,7 +695,8 @@ const onMsg = (msg, sender, reply) => {
       // --- popup ---
       case "popupState": return api("/api/ext/state");
       case "start": await autoStop(); return startProduct(msg.pid, msg.sites);
-      case "autoStart": return autoStart(msg.pid, msg.sites);
+      case "autoStart": return autoStart(msg.pid, msg.sites, msg.line, msg.lineName, msg.allSites);
+      case "autoSetLine": return autoSetLine(msg.line, msg.lineName, msg.sites);
       case "batchStart": return batchStart(msg.line, msg.site, msg.target);
       case "batchStop": return batchStop("вручную");
       case "batchState": { const b = await getBatch(); return { batch: b && b.on ? b : null }; }
@@ -859,7 +871,7 @@ chrome.runtime.onMessage.addListener(onMsg);
 // ---------- мост с окном программы Donini Poster ----------
 // Окно программы (отдельное приложение, не вкладка Chrome) управляет расширением через программу:
 // расширение постоянно спрашивает у программы «есть команда?» и отвечает результатом.
-const BRIDGE_ALLOWED = ["pubGet", "pubSet", "popupState", "autoState", "batchState", "autoStart", "autoStop",
+const BRIDGE_ALLOWED = ["pubGet", "pubSet", "popupState", "autoState", "batchState", "autoStart", "autoStop", "autoSetLine",
   "batchStart", "batchStop", "start", "record", "managerSyncNow", "status", "openTab", "szwegoAll"];
 // открыть сайт в Chrome и показать окно (кнопки «Открыть …» в окне программы)
 async function openTabFront(url) {

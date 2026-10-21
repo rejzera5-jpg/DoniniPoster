@@ -719,7 +719,7 @@ function autoLine(){
   const A = EXT.auto; if(!A) return "";
   const wu = A.waitUntil && A.waitFor === A.pid ? A.waitUntil : 0;
   const left = Math.round((wu - Date.now()) / 1000);
-  return `Открыто товаров: ${A.count || 1}. ${left > 0 ? `⏳ следующий через ${Math.floor(left/60)}:${String(left%60).padStart(2,"0")}` : "⚙️ идёт выставление…"}`;
+  return `${A.lineName ? `Очередь «${esc(A.lineName)}». ` : ""}Открыто товаров: ${A.count || 1}. ${left > 0 ? `⏳ следующий через ${Math.floor(left/60)}:${String(left%60).padStart(2,"0")}` : "⚙️ идёт выставление…"}`;
 }
 async function pickNext(){
   const st = await ext({type:"popupState"});
@@ -738,6 +738,27 @@ async function autoStart(){
   await loadExt(); render(true);
 }
 async function autoStop(){ await ext({type:"autoStop"}); await loadExt(); render(true); }
+// «▶ Выставлять» на плитке очереди: авто-режим только по этой очереди (виду товара)
+async function autoStartLine(lineId){
+  const l = S.lines.find(x => x.id === lineId); if(!l) return;
+  if(!EXT.ok) return alert("Расширение в браузере не отвечает.");
+  if(EXT.auto && EXT.auto.line === lineId){ await autoStop(); return; }
+  const st = await ext({type:"popupState"});
+  const ps = ((st && st.products) || []).filter(p => p.line === lineId);
+  if(!ps.length) return alert(`В очереди «${l.name}» нет товаров, которые ждут выставления на включённые сайты.`);
+  const sites = [...new Set(ps.flatMap(p => p.sites.map(s => s.id)))];
+  if(EXT.auto){
+    if(!confirm(`Сейчас идёт авто-режим${EXT.auto.lineName ? ` («${EXT.auto.lineName}»)` : ""}.\n\nПереключить его на очередь «${l.name}»? Текущий товар доделается, дальше пойдут только «${l.name}».`)) return;
+    const r = await ext({type:"autoSetLine", line: lineId, lineName: l.name, sites});
+    if(!r || r.ok === false) alert("Не получилось: " + ((r && r.error) || "расширение не ответило"));
+  } else {
+    const p = ps[0];
+    const r = await ext({type:"autoStart", pid: p.id, sites: p.sites.map(s => s.id), allSites: sites, line: lineId, lineName: l.name}, 30000);
+    if(!r || r.ok === false) alert("Не получилось запустить: " + ((r && r.error) || "расширение не ответило"));
+  }
+  toast(`▶ Выставляю очередь «${l.name}»`);
+  await loadExt(); render(true);
+}
 async function savePub(patch){ EXT.pub = await ext({type:"pubSet", ...patch}); renderPub(); }
 
 function renderBoardsControls(){
@@ -1531,6 +1552,7 @@ function renderDrops(){
       const n = act.filter(p => p.line === l.id).length, u = UP[l.id];
       return `<div class="drop" data-line="${esc(l.id)}"><span class="ic">${LINE_IC(l)}</span><b>${esc(l.id === "site" ? "Мой сайт" : l.name)}</b>
         <div class="q">в очереди: ${n}</div>
+        ${l.id !== "site" && n ? `<button class="sm ${EXT.auto && EXT.auto.line === l.id ? "stop" : "go"}" data-autoline="${esc(l.id)}" style="margin-top:6px" title="Выставлять подряд только эту очередь">${EXT.auto && EXT.auto.line === l.id ? "■ Идёт — стоп" : "▶ Выставлять"}</button>` : ""}
         ${u && u.total && u.done < u.total ? `<div class="prog"><i style="width:${Math.round(u.done / u.total * 100)}%"></i></div><div class="q">загружаю ${u.done} из ${u.total} фото…</div>` : ""}
         ${u && u.msg ? `<div class="msg ${u.err ? "e" : ""}">${esc(u.msg)}</div>` : ""}</div>`;
     }).join(""));
@@ -1586,7 +1608,7 @@ document.addEventListener("drop", async e => {
   uploadTo(d.dataset.line, items);
 });
 let pickLine = null;
-document.addEventListener("click", e => { const d = e.target.closest(".drop"); if(!d) return; pickLine = d.dataset.line; $("#dirPick").value = ""; $("#dirPick").click(); });
+document.addEventListener("click", e => { const ab = e.target.closest("[data-autoline]"); if(ab){ e.stopPropagation(); autoStartLine(ab.dataset.autoline); return; } const d = e.target.closest(".drop"); if(!d) return; pickLine = d.dataset.line; $("#dirPick").value = ""; $("#dirPick").click(); });
 $("#dirPick").onchange = (e) => {
   const files = [...e.target.files].map(f => ({file: f, rel: f.webkitRelativePath || f.name}));
   if(pickLine && files.length) uploadTo(pickLine, files);
@@ -1607,18 +1629,29 @@ async function loadPhotosPage(){
   pullStatus();
 }
 let catRefreshing = false, catRefreshedAt = 0;
+// запрос к программе с ограничением по времени: если сайт doninisklep.com «висит», каталог не замирает
+async function fetchT(url, ms = 30000){
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), ms);
+  try { return await (await fetch(url, {signal: ctl.signal})).json(); } finally { clearTimeout(t); }
+}
 async function catRefresh(manual){
-  if(catRefreshing || CAT.running.size) return;
+  if(catRefreshing && !manual) return;
+  if(CAT.running.size && !manual) return;
   catRefreshing = true; catRefreshedAt = Date.now();
   const btn = $("#catReload"); if(btn) btn.disabled = true;
+  if(!$("#catCats").children.length) $("#catCats").innerHTML = `<span class="muted small">Загружаю категории с сайта…</span>`;
   try{
-    try{ const r = await (await fetch("/api/woo/lists?fresh=1")).json(); if(r.categories){ wooListsLoaded = true;
+    let listsErr = "";
+    try{ const r = await fetchT("/api/woo/lists?fresh=1"); if(!r.categories) listsErr = r.detail || "сайт не ответил"; if(r.categories){ wooListsLoaded = true;
       const cats = r.categories.filter(c => c.count > 0).sort((a, b) => b.count - a.count);
       let sc = ""; try{ sc = localStorage.getItem("catCat") || ""; }catch(e){}
       if(sc && !cats.some(c => String(c.id) === sc)) sc = "";
       CAT.cat = sc;
-      $("#catCats").innerHTML = `<button class="chip ${sc ? "" : "sel"}" data-cat="">Все товары</button>` + cats.map(c => `<button class="chip ${String(c.id) === sc ? "sel" : ""}" data-cat="${c.id}">${esc(c.name)} · ${c.count}</button>`).join(""); } }catch(e){}
-    try{ const b = await (await fetch("/api/woo/brands?fresh=1")).json(); if(b.brands) $("#catBrand").innerHTML = `<option value="">все бренды</option>` + b.brands.filter(x => x.count).map(x => `<option value="${x.id}">${esc(x.name)} (${x.count})</option>`).join("");
+      $("#catCats").innerHTML = `<button class="chip ${sc ? "" : "sel"}" data-cat="">Все товары</button>` + cats.map(c => `<button class="chip ${String(c.id) === sc ? "sel" : ""}" data-cat="${c.id}">${esc(c.name)} · ${c.count}</button>`).join(""); } }catch(e){ listsErr = e.name === "AbortError" ? "сайт doninisklep.com долго не отвечает" : String(e.message || e); }
+    if(listsErr && !$("#catCats [data-cat]")){
+      $("#catCats").innerHTML = `<span class="warn small">⚠️ Категории не загрузились: ${esc(listsErr)}.</span> <button class="sm" onclick="catRefresh(true)">⟳ Ещё раз</button>`;
+    }
+    try{ const b = await fetchT("/api/woo/brands?fresh=1"); if(b.brands) $("#catBrand").innerHTML = `<option value="">все бренды</option>` + b.brands.filter(x => x.count).map(x => `<option value="${x.id}">${esc(x.name)} (${x.count})</option>`).join("");
       try{ const sb = localStorage.getItem("catBrand") || ""; if([...$("#catBrand").options].some(o => o.value === sb)) $("#catBrand").value = sb; }catch(e){} }catch(e){}
     await catLoad(true);
     if(manual) toast("✓ Каталог обновлён с сайта");
@@ -1668,8 +1701,9 @@ async function catLoad(reset){
   $("#catMore").classList.add("hidden");
   if(reset) $("#catGrid").innerHTML = `<div class="empty">Загружаю товары с сайта…</div>`;
   let r;
-  try{ r = await (await fetch("/api/woo/catalog?" + q)).json(); }catch(e){ r = null; }
-  if(!r || !r.products){ $("#catGrid").innerHTML = `<div class="empty">${esc((r && r.detail) || "Сайт не подключён — «Мой сайт» → «⚙️ Подключение».")}</div>`; return; }
+  let er = "";
+  try{ r = await fetchT("/api/woo/catalog?" + q, 45000); }catch(e){ r = null; er = e.name === "AbortError" ? "Сайт doninisklep.com долго не отвечает." : "Программа не ответила."; }
+  if(!r || !r.products){ $("#catGrid").innerHTML = `<div class="empty">${esc(er || (r && r.detail) || "Сайт не подключён — «Мой сайт» → «⚙️ Подключение».")}<br><button class="sm" style="margin-top:8px" onclick="catRefresh(true)">⟳ Попробовать ещё раз</button></div>`; return; }
   CAT.items = CAT.items.concat(r.products);
   $("#catMore").classList.toggle("hidden", !r.more);
   catRender();

@@ -1689,7 +1689,7 @@
     });
     // окно программы управляет расширением напрямую: авто-режим, пачки, режим публикации, запись сценария.
     // Разрешены только эти команды; страница программы открыта только на этом компьютере (127.0.0.1).
-    const ALLOWED = ["pubGet", "pubSet", "popupState", "autoState", "batchState", "autoStart", "autoStop",
+    const ALLOWED = ["pubGet", "pubSet", "popupState", "autoState", "batchState", "autoStart", "autoStop", "autoSetLine",
       "batchStart", "batchStop", "start", "record", "managerSyncNow", "extInfo"];
     addEventListener("message", async (ev) => {
       if (ev.source !== window || !ev.data || ev.data.donini !== "ext" || !ev.data.msg) return;
