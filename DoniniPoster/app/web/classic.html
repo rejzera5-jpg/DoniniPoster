@@ -1,0 +1,2264 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Donini Poster</title>
+<link rel="icon" href="/icon.png">
+<style>
+  :root{
+    --bg:#121014; --side:#17141a; --surface:#1d1a21; --surface-2:#26222b; --surface-3:#302b36;
+    --text:#efe9e2; --muted:#9d948a; --border:#332e39;
+    --accent:#d18b56; --accent-ink:#1c1108; --accent-soft:#3a2a1d;
+    --ok:#6ec98a; --ok-soft:#1b3123; --err:#ef8a72; --err-soft:#3d1f1a; --run:#7fb0f0; --run-soft:#1a2a40;
+    --warn:#e8c46a; --warn-soft:#3a3018;
+    --mono:ui-monospace,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px "Segoe UI",system-ui,sans-serif;display:flex;overflow:hidden}
+  ::-webkit-scrollbar{width:10px;height:10px} ::-webkit-scrollbar-thumb{background:var(--surface-3);border-radius:10px} ::-webkit-scrollbar-track{background:transparent}
+  /* ---- меню слева ---- */
+  aside{width:220px;flex:none;background:var(--side);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:14px 10px;gap:2px}
+  .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 16px}
+  .brand img{width:34px;height:34px;border-radius:9px}
+  .brand b{font:600 17px Georgia,serif;display:block} .brand span{font-size:11px;color:var(--muted)}
+  .nav{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:none;color:var(--muted);padding:9px 12px;border-radius:10px;font-weight:600;cursor:pointer;font-size:14px}
+  .nav:hover{background:var(--surface);color:var(--text)}
+  .nav.active{background:var(--accent-soft);color:var(--accent)}
+  .nav .ic{width:20px;text-align:center}
+  .nav .badge{margin-left:auto;font-size:11px;padding:1px 7px;border-radius:999px;background:var(--surface-3);color:var(--text)}
+  .nav .badge.err{background:var(--err-soft);color:var(--err)}
+  .nav .badge.hidden{display:none}
+  .navsep{height:1px;background:var(--border);margin:8px 6px}
+  .side-foot{margin-top:auto;font-size:11px;color:var(--muted);padding:8px;line-height:1.6}
+  /* ---- правая часть ---- */
+  .wrap{flex:1;display:flex;flex-direction:column;min-width:0}
+  header{display:flex;align-items:center;gap:10px;padding:12px 22px;border-bottom:1px solid var(--border);background:var(--bg);flex-wrap:wrap}
+  header h2{margin:0;font-size:19px;font-weight:600;margin-right:6px}
+  main{flex:1;overflow:auto;padding:18px 22px 40px}
+  .page{display:flex;flex-direction:column;gap:14px}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:12px;font-weight:600;background:var(--surface-2);color:var(--muted);white-space:nowrap}
+  .pill.on{background:var(--ok-soft);color:var(--ok)} .pill.bad{background:var(--err-soft);color:var(--err)} .pill.run{background:var(--run-soft);color:var(--run)} .pill.warn{background:var(--warn-soft);color:var(--warn)}
+  .dot{width:8px;height:8px;border-radius:50%;background:currentColor}
+  .spacer{flex:1}
+  button{font:inherit;cursor:pointer;border-radius:9px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);padding:7px 13px}
+  button:hover{border-color:var(--accent)}
+  button:disabled{opacity:.5;cursor:default}
+  button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+  button.go{background:var(--ok);color:#0e1f13;border-color:var(--ok);font-weight:600}
+  button.stop{background:var(--err-soft);color:var(--err);border-color:var(--err);font-weight:600}
+  button.danger{color:var(--err)}
+  button.sm{padding:4px 9px;font-size:12px}
+  button.big{padding:11px 18px;font-size:15px}
+  .muted{color:var(--muted)} .small{font-size:12px}
+  .card{border:1px solid var(--border);border-radius:14px;padding:16px;background:var(--surface);display:flex;flex-direction:column;gap:10px;min-width:0}
+  .card h3{margin:0;font-size:15px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .card.on{border-color:var(--ok)} .card.hot{border-color:var(--accent)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+  .tile{border:1px solid var(--border);border-radius:14px;padding:16px;background:var(--surface);display:flex;flex-direction:column;gap:8px}
+  .tile .t{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+  .tile .n{font-size:30px;font-weight:700;line-height:1}
+  .tile .s{font-size:12px;color:var(--muted)}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+  input,select,textarea{font:inherit;color:var(--text);background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:6px 8px}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:0}
+  input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
+  input.mini{width:90px} input.tiny{width:64px}
+  table{width:100%;border-collapse:collapse}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);text-align:left;padding:8px 6px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface)}
+  td{padding:8px 6px;border-bottom:1px solid var(--border);vertical-align:middle}
+  tr:hover td{background:#ffffff05}
+  .thumb{width:54px;height:54px;border-radius:8px;object-fit:cover;background:var(--surface-2);display:block}
+  .code{font-family:var(--mono);font-weight:700;color:var(--accent)}
+  .chips{display:flex;flex-wrap:wrap;gap:4px}
+  .chip{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--surface-2);color:var(--muted);text-decoration:none;cursor:default;white-space:nowrap;border:1px solid transparent}
+  .chip.done{background:var(--ok-soft);color:var(--ok);cursor:pointer}
+  .brandtg{padding:1px 7px;font-size:11px;margin-left:4px;border-radius:10px}
+  .brandstrip{margin-top:6px;align-items:center}
+  .qcwhy{position:absolute;left:4px;right:4px;bottom:4px;font-size:10px;line-height:1.2;background:rgba(200,40,40,.85);color:#fff;border-radius:6px;padding:2px 4px}
+  .qcbadge{color:var(--warn, #d9a441)}
+  #qcLevel{font-size:12px;padding:2px 6px}
+  input.noprice{border-color:var(--err);background:var(--err-soft)}
+  input.noprice::placeholder{color:var(--err)}
+  .chip.brandsite{cursor:pointer;border:1px solid transparent;font:inherit;font-size:12px}
+  .chip.brandsite.on{background:var(--ok-soft);color:var(--ok);border-color:var(--ok)}
+  .chip.brandsite.off{background:var(--err-soft);color:var(--err);border-color:var(--err)}
+  .tplsel{font-size:11px;padding:1px 4px;max-width:260px;height:auto}
+  .tplsel.own{color:var(--accent);border-color:var(--accent)}
+  .tplbar{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin:0 0 10px}
+  .tplitem{display:inline-flex;gap:6px;align-items:center}
+  .tplitem select{font-size:12px;padding:2px 6px}
+  .brandtg.on{color:var(--ok);border-color:var(--ok)}
+  .brandtg.off{color:var(--err, #e5534b);border-color:var(--err, #e5534b)}
+  .chip.error{background:var(--err-soft);color:var(--err);cursor:pointer}
+  .chip.running{background:var(--run-soft);color:var(--run);animation:pulse 1.2s infinite}
+  .chip.skipped{opacity:.45;text-decoration:line-through}
+  .chip.sel{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  button.chip{cursor:pointer;padding:5px 11px;font-size:12px}
+  @keyframes pulse{50%{opacity:.5}}
+  .sc{background:var(--surface-2);border-radius:9px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .warn{color:var(--err);font-size:12px} .ok{color:var(--ok);font-size:12px}
+  pre.log{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;max-height:calc(100vh - 210px);overflow:auto;font:12px/1.55 var(--mono);white-space:pre-wrap;margin:0}
+  .logline.e{color:var(--err)} .logline.o{color:var(--ok)} .logline.w{color:var(--warn)}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;width:min(720px,100%);max-height:85vh;overflow:auto;display:flex;flex-direction:column;gap:12px}
+  .steps{padding-left:20px} .steps li{padding:6px 0;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center}
+  .steps code{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .switch{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-size:13px}
+  .help{background:var(--surface-2);border-left:3px solid var(--accent);border-radius:8px;padding:10px 14px;line-height:1.55;font-size:13px;color:var(--muted)}
+  .help b{color:var(--text)}
+  details.help summary{cursor:pointer;color:var(--text);font-weight:600}
+  .empty{padding:30px;text-align:center;color:var(--muted)}
+  .tpl{white-space:pre-wrap;background:var(--surface-2);border-radius:8px;padding:8px;font-size:12px;max-height:200px;overflow:auto}
+  .seg{display:inline-flex;background:var(--surface-2);border-radius:10px;padding:3px;gap:3px}
+  .seg button{border:0;background:none;padding:6px 12px;border-radius:8px;color:var(--muted);font-weight:600}
+  .seg button.on{background:var(--accent);color:var(--accent-ink)}
+  .banner{border-radius:12px;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}
+  .banner.err{background:var(--err-soft);color:var(--err);border:1px solid var(--err)}
+  .banner.warn{background:var(--warn-soft);color:var(--warn);border:1px solid #6b5a2a}
+  .loglist{font:12px/1.55 var(--mono);display:flex;flex-direction:column;gap:2px;max-height:300px;overflow:auto}
+  .soon{display:flex;flex-direction:column;gap:6px}
+  .soon li{margin:2px 0}
+  .drops{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+  .drop{border:2px dashed var(--surface-3);border-radius:14px;padding:18px 12px;text-align:center;cursor:pointer;background:var(--surface-2);transition:.15s;user-select:none}
+  .drop:hover{border-color:var(--accent)}
+  .drop.over{border-color:var(--accent);background:var(--accent-soft);transform:scale(1.02)}
+  .drop .ic{font-size:26px;display:block;margin-bottom:4px}
+  .drop b{display:block;font-size:15px}
+  .drop .q{font-size:12px;color:var(--muted);margin-top:3px}
+  .drop .msg{font-size:12px;margin-top:6px;color:var(--ok)}
+  .drop .msg.e{color:var(--err)}
+  .drop .prog{height:5px;background:var(--surface-3);border-radius:5px;margin-top:8px;overflow:hidden}
+  .drop .prog i{display:block;height:100%;background:var(--accent)}
+  .brand-logo{width:100%;border-radius:10px;display:block;background:#fff}
+  .catgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+  .ptile{position:relative;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface-2);cursor:pointer;transition:.12s}
+  .ptile:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .ptile img{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;background:#fff}
+  .ptile .pi{padding:7px 9px;font-size:12px;line-height:1.35}
+  .ptile .pi b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ptile .bdg{position:absolute;top:6px;right:6px;font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:rgba(0,0,0,.7);color:#fff}
+  .ptile .bdg.ok{background:var(--ok);color:#0e1f13} .ptile .bdg.run{background:var(--accent);color:var(--accent-ink)}
+  .ptile.done{opacity:.55}
+  .catgrid > .empty, .catgrid > div:not(.ptile){grid-column:1/-1}
+  .guide h4{margin:4px 0 2px;font-size:14px} .guide ol{margin:4px 0 0;padding-left:20px;line-height:1.7} .guide code{background:var(--surface-3);padding:1px 6px;border-radius:5px;font-family:var(--mono);font-size:12px}
+  .ptile .ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(10,8,12,.62);color:#fff;font-weight:700;font-size:13px;text-align:center;padding:8px}
+  .ptile .ov.ok{background:rgba(30,90,50,.72)}
+  .ptile .ov.err{background:rgba(120,30,20,.72)}
+  .spin{width:30px;height:30px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp 0.8s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .pbar{height:8px;background:var(--surface-3);border-radius:8px;overflow:hidden}
+  .pbar i{display:block;height:100%;background:var(--ok);transition:width .3s}
+  #catProg{position:sticky;top:0;z-index:5;background:var(--surface);padding:10px 0;display:flex;flex-direction:column;gap:6px}
+  .toast{position:fixed;right:20px;bottom:20px;z-index:60;background:var(--ok);color:#0e1f13;font-weight:600;padding:11px 16px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:420px;animation:tin .2s}
+  .toast.err{background:var(--err);color:#fff}
+  @keyframes tin{from{transform:translateY(10px);opacity:0}}
+  .sr{border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--surface-2)}
+  .sr .ph{display:flex;gap:6px;overflow-x:auto}
+  .sr .ph img{width:74px;height:74px;object-fit:cover;border-radius:8px;flex:none;background:#fff;cursor:zoom-in}
+  .sr .code{font-size:18px}
+  a.chip{cursor:pointer}
+  kbd{display:inline-block;min-width:22px;text-align:center;background:var(--surface-3);border:1px solid var(--border);border-bottom-width:2px;border-radius:6px;padding:1px 6px;font-family:var(--mono);font-size:12px}
+  .keys td{padding:6px 8px} .keys td:first-child{white-space:nowrap}
+  tr.selrow td{background:var(--accent-soft)}
+  .bulk{position:sticky;top:0;z-index:6;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--accent-soft);border:1px solid var(--accent);border-radius:12px;padding:8px 12px;margin:6px 0}
+  .card-ph{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+  .card-ph .ph{position:relative;border:2px solid var(--border);border-radius:10px;overflow:hidden;background:#fff;cursor:grab}
+  .card-ph .ph.main{border-color:var(--accent)}
+  .card-ph .ph img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+  .card-ph .ph .n{position:absolute;top:4px;left:4px;background:#000b;color:#fff;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px}
+  .card-ph .ph .bt{position:absolute;bottom:4px;left:4px;right:4px;display:flex;gap:3px;justify-content:center;opacity:0;transition:.15s}
+  .card-ph .ph:hover .bt{opacity:1}
+  .card-ph .ph .bt button{padding:2px 6px;font-size:12px;background:#000c;color:#fff;border:0}
+  .card-ph.off .ph{opacity:.45;cursor:pointer}
+  .lb{position:fixed;inset:0;z-index:80;background:rgba(5,4,7,.94);display:flex;flex-direction:column}
+  .lb .top{display:flex;align-items:center;gap:10px;padding:12px 18px;color:#fff}
+  .lb .stage{flex:1;display:flex;align-items:center;justify-content:center;position:relative;min-height:0}
+  .lb .stage img{max-width:calc(100% - 140px);max-height:100%;object-fit:contain;border-radius:8px;box-shadow:0 10px 40px #000}
+  .lb .nav2{position:absolute;top:50%;transform:translateY(-50%);font-size:28px;width:54px;height:80px;border-radius:12px;background:#ffffff14;color:#fff;border:0}
+  .lb .nav2:hover{background:#ffffff2a}
+  .lb .strip{display:flex;gap:6px;padding:10px 18px;overflow-x:auto;justify-content:center}
+  .lb .strip img{width:64px;height:64px;object-fit:cover;border-radius:6px;cursor:pointer;opacity:.55;border:2px solid transparent;flex:none}
+  .lb .strip img.on{opacity:1;border-color:var(--accent)} .lb .strip img.off{filter:grayscale(1)}
+  .lb .tag{padding:3px 10px;border-radius:999px;font-weight:700;font-size:12px}
+  .card-ph .ph img{cursor:zoom-in}
+  .hidden{display:none!important}
+  @media (max-width:900px){ aside{width:62px;padding:12px 6px} .nav .lbl,.brand div,.side-foot,.nav .badge{display:none} .nav{justify-content:center} }
+  body.embed aside, body.embed header{display:none!important}
+  body.embed .wrap{margin-left:0!important}
+</style>
+<script>if(/[?&]embed=1/.test(location.search)) document.documentElement.classList.add("embed");</script>
+</head>
+<body>
+<script>if(/[?&]embed=1/.test(location.search)) document.body.classList.add("embed");</script>
+<aside>
+  <div class="brand" id="brandBox"><img src="/icon.png" alt=""><div><b>Donini Poster</b><span id="verInfo">…</span></div></div>
+  <button class="nav active" data-page="home"><span class="ic">🏠</span><span class="lbl">Главная</span></button>
+  <button class="nav" data-page="site"><span class="ic">🌐</span><span class="lbl">Мой сайт</span><span class="badge hidden" id="bSite"></span></button>
+  <button class="nav" data-page="boards"><span class="ic">📦</span><span class="lbl">Доски объявлений</span><span class="badge hidden" id="bBoards"></span></button>
+  <button class="nav" data-page="photos"><span class="ic">⬇</span><span class="lbl">Скачать фото</span></button>
+  <button class="nav" data-page="manager"><span class="ic">🧾</span><span class="lbl">Donini Manager</span></button>
+  <div class="navsep"></div>
+  <button class="nav" data-page="sites"><span class="ic">🧩</span><span class="lbl">Сайты и сценарии</span></button>
+  <button class="nav" data-page="lines"><span class="ic">🗂</span><span class="lbl">Виды товара</span></button>
+  <button class="nav" data-page="insta"><span class="ic">📸</span><span class="lbl">Instagram</span><span class="badge">скоро</span></button>
+  <div class="navsep"></div>
+  <button class="nav" data-page="help"><span class="ic">📘</span><span class="lbl">Инструкция</span></button>
+  <button class="nav" data-page="edits"><span class="ic">✏️</span><span class="lbl">Исправить объявления</span><span class="badge hidden" id="bEdits"></span></button>
+  <button class="nav" data-page="log"><span class="ic">📜</span><span class="lbl">Журнал</span><span class="badge err hidden" id="bLog"></span></button>
+  <button class="nav" data-page="settings"><span class="ic">⚙️</span><span class="lbl">Настройки</span></button>
+  <div class="side-foot" id="sideFoot"></div>
+  <button class="nav" id="keysBtn" style="font-size:12px"><span class="ic">⌨</span><span class="lbl">Горячие клавиши</span></button>
+  <button class="nav" id="updBtn" style="font-size:12px"><span class="ic">⬆</span><span class="lbl" id="updLbl">Проверить обновления</span></button>
+  <button class="nav" id="applyBtn" style="font-size:12px;display:none;color:var(--ok)"><span class="ic">🔄</span><span class="lbl" id="applyLbl">Применить изменения</span></button>
+</aside>
+
+<div class="wrap">
+<header>
+  <h2 id="pageTitle">Главная</h2>
+  <span id="extPill" class="pill" title="Расширение Donini в браузере — оно заполняет объявления на досках">…</span>
+  <span id="recPill" class="pill bad hidden"><span class="dot"></span>идёт запись</span>
+  <span id="whPill" class="pill warn hidden"></span>
+  <span class="spacer"></span>
+  <div style="position:relative"><input id="gSearch" placeholder="🔎 Код или название товара   Ctrl+K" style="width:260px;padding:7px 12px;border-radius:999px"></div>
+  <span class="small muted">последний код: <b id="counter" class="code">—</b></span>
+  <button id="openQueueBtn" title="Открыть папку «Очередь»">📂 Очередь</button>
+  <button id="toggleBtn" title="Пауза фоновых сайтов программы (сценарии в фоне). Мой сайт и авто-режим досок управляются на своих страницах">⏸ Пауза</button>
+</header>
+<main>
+<div id="updBanner"></div><div id="applyBanner"></div>
+<div id="extBanner"></div>
+
+<!-- ============ ГЛАВНАЯ ============ -->
+<section class="page" id="page-home">
+  <div class="card"><h3>📥 Добавить товары <span class="small muted" style="font-weight:400">перетащите папки товаров на нужный вид — или нажмите и выберите папку</span></h3>
+    <div class="drops" data-drops="all"></div></div>
+  <div class="tiles" id="homeTiles"></div>
+  <div class="grid2">
+    <div class="card" id="homeSiteCard"></div>
+    <div class="card" id="homeBoardsCard"></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>Сайты сейчас <button class="sm" data-goto="sites">Все сайты →</button></h3><div id="homeSites" class="chips"></div></div>
+    <div class="card"><h3>Последние события <button class="sm" data-goto="log">Журнал →</button></h3><div id="homeLog" class="loglist"></div></div>
+  </div>
+</section>
+
+<!-- ============ МОЙ САЙТ ============ -->
+<section class="page hidden" id="page-site">
+  <div class="card hot" id="wooRunCard">
+    <h3><span>🌐 Загрузка на doninisklep.com</span><span id="wooPill" class="pill">…</span></h3>
+    <div class="row">
+      <button id="wRun" class="go big">▶ Начать загрузку</button>
+      <button id="wFolder">📂 Папка «Очередь сайта»</button>
+      <span id="wInfo" class="muted"></span>
+    </div>
+    <div class="small muted">Кладите папки товаров в <b>«Очередь сайта»</b>. Загрузка идёт в программе, без браузера и параллельно с досками. Каждый товар — копия товара-образца: меняются фото, код, бренд, размер и цена.</div>
+  </div>
+  <div class="card"><h3>📥 Добавить товары на сайт</h3><div class="drops" data-drops="site"></div></div>
+  <div class="card">
+    <h3><span>Очередь сайта</span>
+      <span class="row"><label class="switch small"><input type="checkbox" class="showHistory"> показать загруженные</label>
+      <button class="sm" data-tplreset="site" title="Все товары в очереди — с текстом из текущего шаблона (убрать свои тексты ✏️)">↺ Тексты по шаблону</button>
+      <button class="sm danger" data-clear="site">🗑 Очистить</button></span></h3>
+    <div id="bulkSite"></div>
+    <div id="qSite"></div>
+  </div>
+  <details class="card" id="wooCard">
+    <summary style="cursor:pointer;font-weight:600">⚙️ Подключение и образец товара</summary>
+    <div class="small muted" style="margin-top:10px">Ключ: WordPress → WooCommerce → Настройки → Дополнительно → REST API → «Добавить ключ» (права «Чтение/Запись»). Пароль приложения: Пользователи → Профиль → «Пароли приложений» (для загрузки фото).</div>
+    <label class="field">Адрес сайта<input id="w_url" placeholder="https://doninisklep.com"></label>
+    <div class="row">
+      <label class="field" style="flex:1">Consumer key<input id="w_ck" placeholder="ck_..."></label>
+      <label class="field" style="flex:1">Consumer secret<input id="w_cs" placeholder="cs_..."></label>
+    </div>
+    <div class="row">
+      <label class="field" style="flex:1">Логин WordPress<input id="w_user"></label>
+      <label class="field" style="flex:1">Пароль приложения<input id="w_pass" placeholder="xxxx xxxx xxxx xxxx"></label>
+    </div>
+    <label class="field">Товар-образец (как «Duplicate»): ссылка, ID или артикул<input id="w_tpl" placeholder="https://doninisklep.com/produkt/... или 1234"></label>
+    <div id="wTplInfo" class="small"></div>
+    <div id="wLists" style="display:none">
+      <label class="field">Категория<select id="w_cat"></select></label>
+      <div class="row">
+        <label class="field" style="flex:1">Атрибут «Бренд»<select id="w_brand"></select></label>
+        <label class="field" style="flex:1">Атрибут «Размер»<select id="w_size"></select></label>
+      </div>
+    </div>
+    <div class="row">
+      <label class="field" style="flex:1">Публикация<select id="w_status"><option value="publish">сразу на сайт</option><option value="draft">черновиком (проверю сам)</option></select></label>
+      <label class="field" style="flex:1">Пауза между товарами, сек<input id="w_pause" class="mini" value="10"></label>
+    </div>
+    <div class="row"><button id="wCheck">Проверить подключение</button><button id="wSave" class="primary">Сохранить</button></div>
+  </details>
+</section>
+
+<!-- ============ ДОСКИ ============ -->
+<section class="page hidden" id="page-boards">
+  <div class="card"><h3>📥 Добавить товары для досок <span class="small muted" style="font-weight:400">можно сразу 100 папок или одну общую папку со всеми товарами</span></h3>
+    <div class="drops" data-drops="boards"></div></div>
+  <div class="grid2">
+    <div class="card" id="autoCard"></div>
+    <div class="card" id="batchCard"></div>
+  </div>
+  <details class="card" id="pubCard">
+    <summary style="cursor:pointer;font-weight:600">⚙️ Как публиковать: режим, паузы, фон</summary>
+    <div id="pubBox" style="margin-top:10px;display:flex;flex-direction:column;gap:10px"></div>
+  </details>
+  <div class="card">
+    <h3><span>Очередь для досок</span>
+      <span class="row">
+        <select id="qLineFilter"><option value="">все виды товара</option></select>
+        <select id="qStateFilter"><option value="">все</option><option value="error">только с ошибками</option></select>
+        <label class="switch small"><input type="checkbox" class="showHistory"> показать выставленные</label>
+        <button class="sm" id="syncManager" title="Шаблоны текстов — встроенный Donini Manager, правки применяются сразу">🧾 Шаблоны</button>
+        <button class="sm" id="sizesFromSite" title="Товарам, скачанным с моего сайта, у которых нет размера, — подставить размер с сайта">📏 Размеры с сайта</button>
+        <button class="sm" data-tplreset="boards" title="Все товары в очереди — с текстом из текущего шаблона (убрать свои тексты ✏️)">↺ Тексты по шаблону</button>
+        <button class="sm danger" data-clear="boards">🗑 Очистить</button>
+      </span></h3>
+    <div id="siteStrip" class="chips"></div>
+    <div id="brandStrip" class="chips brandstrip"></div>
+    <div class="chips brandstrip"><span class="small muted">🧹 Плохие фото (битые, недокачанные, замыленные, повторы):</span>
+      <select id="qcLevel" title="Программа сама проверяет фото каждого нового товара и не ставит плохие в объявление. Файлы не удаляются — в карточке товара их можно вернуть.">
+        <option value="normal">убирать</option><option value="soft">убирать только явно плохие</option><option value="strict">убирать строже</option><option value="off">не проверять</option></select>
+      <button class="sm" id="qcAll" title="Проверить фото всех товаров в очереди заново">🧹 Проверить всю очередь</button></div>
+    <div id="bulkBoards"></div>
+    <div id="qBoards"></div>
+  </div>
+</section>
+
+<!-- ============ СКАЧАТЬ ФОТО ============ -->
+<section class="page hidden" id="page-photos">
+  <div class="card">
+    <h3><span>🇨🇳 微商相册 — альбомы поставщиков</span><button class="sm" id="szOpen">🌐 Открыть 微商相册 в браузере</button></h3>
+    <div class="small muted">Откройте в браузере альбом поставщика один раз — он сам появится здесь со списком разделов. Дальше: выберите раздел и вид товара → «⬇ Скачать в очередь». Альбом откроется в фоновом окне Chrome, фото скачаются в очередь, окно закроется само. Товары без размера тоже скачиваются — в объявлении просто не будет строки с размером.</div>
+    <div id="szShops"></div>
+  </div>
+  <div class="card" id="catCard">
+    <h3><span>🛍 Каталог моего сайта → в очередь для досок</span><span id="pullInfo" class="small muted"></span></h3>
+    <div id="catCats" class="chips"></div>
+    <div class="row">
+      <label class="field">Бренд<select id="catBrand"><option value="">все бренды</option></select></label>
+      <label class="field" style="flex:1;min-width:160px">Поиск<input id="catSearch" placeholder="название, модель, артикул…"></label>
+      <label class="field">Кладу в очередь<select id="pullLine"></select></label>
+      <label class="switch small" style="align-self:flex-end;margin-bottom:6px"><input type="checkbox" id="catHide"> скрыть те, что уже в очереди</label>
+    </div>
+    <div class="row">
+      <span class="small muted" style="flex:1">Нажмите на товар — он скачается в очередь (можно нажимать подряд). «✓ в очереди» — товар сейчас лежит в очереди.</span>
+      <button class="sm" id="catReload" title="Подтянуть новые товары с сайта (делается само при открытии раздела и раз в 2 минуты)">⟳ Обновить с сайта</button>
+      <button class="sm" id="catAll" title="Только товары, которые сейчас видны на странице">⬇ Все на странице</button>
+      <button class="sm go" id="catAllF" title="Все товары сайта с выбранной категорией, брендом и поиском — со всех страниц">⬇ Скачать все по фильтру</button>
+      <button class="stop sm hidden" id="pullStop">■ Стоп</button>
+    </div>
+    <div id="catProg" class="hidden"><div class="row"><b id="catProgT">⬇ Скачиваю…</b><span class="spacer"></span><button class="sm" data-goto="boards">Открыть очередь →</button></div><div class="pbar"><i id="catProgBar" style="width:0%"></i></div></div>
+    <div id="catGrid" class="catgrid"></div>
+    <div class="row" style="justify-content:center"><button id="catMore" class="hidden">Показать ещё</button></div>
+  </div>
+</section>
+
+<!-- ============ DONINI MANAGER ============ -->
+<section class="page hidden" id="page-manager">
+  <div class="row"><label class="field">Шаблон<select id="mgrLine"></select></label>
+    <div class="small muted" style="flex:1">Выберите шаблон — Manager откроет его. В скобках — какие виды товара по нему выставляются. Правки сразу сохраняются в программу и применяются ко всем товарам с этим шаблоном (кроме товаров со своим текстом ✏️).</div></div>
+  <iframe id="mgrFrame" style="width:100%;height:calc(100vh - 150px);border:1px solid var(--border);border-radius:14px;background:#17130f"></iframe>
+</section>
+
+<!-- ============ САЙТЫ ============ -->
+<section class="page hidden" id="page-sites">
+  <div class="row">
+    <button id="addSiteBtn" class="primary">+ Добавить сайт</button>
+    <span class="spacer"></span>
+    <label class="switch small"><input type="checkbox" id="sitesOnlyOn" checked> только включённые</label>
+  </div>
+  <details class="help"><summary>Как записать сценарий сайта</summary>
+    <b>В моём браузере (расширение):</b> выберите вид товара и сайт → «● Записать». Откроется сайт — выставьте объявление как обычно, расширение запомнит шаги. Ничего не публикуется.<br>
+    <b>В фоне (программа сама):</b> «Войти» → один раз войдите в аккаунт; «Записать» → пройдите форму; «Тест» — программа сама заполнит и остановится перед публикацией.
+  </details>
+  <div class="card">
+    <h3>● Записать сценарий (в моём браузере)</h3>
+    <div class="row">
+      <label class="field">Вид товара<select id="recLine"></select></label>
+      <label class="field" style="flex:1">Сайт<select id="recSite"></select></label>
+      <button id="recGo" class="primary" style="align-self:flex-end">● Записать</button>
+    </div>
+  </div>
+  <div id="sitesGrid" class="grid"></div>
+</section>
+
+<!-- ============ ВИДЫ ТОВАРА ============ -->
+<section class="page hidden" id="page-lines">
+  <details class="help"><summary>Что это</summary>
+    Вид товара (линия) = своя папка в очереди + свой шаблон текста + свои сайты. Например «Сумки» — на 5 сайтов, «Кошельки» — на 4.
+    Если добавить сайт в вид товара — товары из его папки, которые уже выставлены на других сайтах, пойдут и на новый сайт (без дублей на старых).
+  </details>
+  <div id="linesBox" class="grid"></div>
+  <div class="row">
+    <button id="addLineBtn">+ Добавить вид товара</button>
+    <button id="saveLinesBtn" class="primary">Сохранить</button>
+    <span id="linesSaved" class="small muted">Изменения сохраняются сами</span>
+  </div>
+</section>
+
+<!-- ============ INSTAGRAM ============ -->
+<section class="page hidden" id="page-insta">
+  <div class="card hot">
+    <h3>📸 Instagram — скоро</h3>
+    <div class="muted">Здесь будет бот для Instagram: товары из этой же очереди → посты и сторис по расписанию.</div>
+    <ul class="soon muted">
+      <li>до 20 постов в день из выбранного вида товара (фото + текст + хэштеги);</li>
+      <li>ежедневная сторис;</li>
+      <li>расписание по часам и пауза;</li>
+      <li>уведомления в Telegram, как для досок.</li>
+    </ul>
+    <div class="small muted">Чтобы начать, напишите в чат: для какого аккаунта, какие товары и в какое время публиковать.</div>
+  </div>
+</section>
+
+<!-- ============ ИНСТРУКЦИЯ ============ -->
+<section class="page hidden" id="page-help">
+  <div class="grid2">
+    <div class="card guide">
+      <h3>🧩 Как установить расширение Donini в браузер</h3>
+      <div class="small muted">Расширение заполняет объявления на досках (OLX, Vatera, Jófogás…) в вашем браузере, где вы уже вошли в аккаунты. Подходят: Яндекс, Chrome, Edge, Brave, Opera. Firefox — нет.</div>
+      <div class="row"><span class="small">Папка расширения:</span> <code id="extPath">…</code>
+        <button class="sm" id="copyExtPath">📋 Скопировать путь</button><button class="sm" id="openExtFolder2">📂 Открыть папку</button></div>
+      <h4>Яндекс Браузер</h4>
+      <ol><li>В адресной строке откройте <code>browser://extensions</code></li>
+        <li>Справа вверху включите <b>«Режим разработчика»</b></li>
+        <li>Нажмите <b>«Загрузить распакованное расширение»</b> и выберите папку <b>extension</b> (путь выше)</li>
+        <li>Нажмите на значок пазла 🧩 справа от адресной строки и закрепите <b>Donini Poster</b></li></ol>
+      <h4>Google Chrome / Brave / Opera</h4>
+      <ol><li>Откройте <code>chrome://extensions</code> (в Opera — <code>opera://extensions</code>)</li>
+        <li>Справа вверху включите <b>«Режим разработчика»</b></li>
+        <li><b>«Загрузить распакованное расширение»</b> → папка <b>extension</b></li>
+        <li>Закрепите значок Donini Poster</li></ol>
+      <h4>Microsoft Edge</h4>
+      <ol><li>Откройте <code>edge://extensions</code></li>
+        <li>Слева внизу включите <b>«Режим разработчика»</b></li>
+        <li><b>«Загрузить распакованное»</b> → папка <b>extension</b></li></ol>
+      <h4>Проверка</h4>
+      <ol><li>Вверху окна программы должно гореть зелёным «расширение v…».</li>
+        <li>Если красное: «Настройки» → «🌐 Браузер с расширением» — выберите свой браузер, потом «🔄 Перезапустить браузер».</li>
+        <li>После обновления программы расширение обновляется при перезапуске браузера (или кнопкой ⟳ на странице расширений).</li></ol>
+    </div>
+    <div class="card guide hot">
+      <h3>💾 Переустановка Windows / новый компьютер</h3>
+      <ol><li><b>До переустановки:</b> нажмите кнопку ниже — на рабочем столе появится <b>«DoniniPoster резервная копия …zip»</b> со всем: настройки, ключи сайта и Telegram, сценарии, шаблоны, очередь. Скопируйте его на флешку или Google Диск. Фото из очереди в архив не входят (они большие) — папку <b>Очередь</b> скопируйте отдельно, если нужно.</li>
+        <li><b>После переустановки:</b> поставьте свой браузер (Яндекс) и войдите в аккаунты сайтов.</li>
+        <li>Распакуйте архив (правый клик → «Извлечь всё…»), например на рабочий стол.</li>
+        <li>Запустите <b>«Запуск.bat»</b> — 3–5 минут программа ставит всё сама. Пути к папкам поправятся сами.</li>
+        <li>Поставьте расширение из папки <b>extension</b> в браузер (инструкция слева) — и всё работает как раньше.</li></ol>
+      <div class="row"><button id="backupBtn" class="primary">💾 Сделать резервную копию</button>
+        <button id="restoreBtn" title="Вернуть настройки, ключи, сценарии и очередь из архива резервной копии">♻️ Восстановить из копии</button>
+        <input type="file" id="restoreFile" accept=".zip" class="hidden"></div>
+    </div>
+    <div class="card guide">
+      <h3>📦 Как передать программу другому человеку</h3>
+      <ol><li>Нажмите кнопку ниже (или «Настройки» → «📦 Сделать копию»). На рабочем столе появится <b>DoniniPoster для передачи.zip</b> — без ваших ключей, Telegram, очереди и журнала, но со всеми записанными сценариями сайтов.</li>
+        <li>Отправьте архив: Telegram, Google Диск, флешка.</li></ol>
+      <button id="exportBtn2" class="primary">📦 Сделать копию для другого человека</button>
+      <h3 style="margin-top:8px">💻 Установка у нового человека</h3>
+      <ol><li>Скачать архив и распаковать: правый клик → <b>«Извлечь всё…»</b>, например в <code>C:\DoniniPoster</code>. Не запускать прямо из архива.</li>
+        <li>В папке запустить <b>«Запуск.bat»</b>. Первый запуск 3–5 минут: программа сама поставит всё нужное (нужен интернет).</li>
+        <li>Появится ярлык <b>«Donini Poster»</b> на рабочем столе; программа будет запускаться вместе с Windows.</li>
+        <li>Установить расширение в свой браузер (слева).</li>
+        <li>В этом браузере войти в свои аккаунты на досках (OLX и др.).</li>
+        <li>Свой сайт: «Мой сайт» → «⚙️ Подключение» — свои ключи WooCommerce.</li>
+        <li>Уведомления: «Настройки» → «Уведомления в Telegram».</li></ol>
+      <h3 style="margin-top:8px">🚀 Как работать каждый день</h3>
+      <ol><li>Товары: перетащите папки на плитку на «Главной» или возьмите в «⬇ Скачать фото» — из 微商相册 или со своего сайта.</li>
+        <li>Свой сайт: «▶ Загружать на сайт».</li>
+        <li>Доски: «▶ Выставлять подряд» или «📦 Пачкой на один сайт».</li>
+        <li>Ошибки видны красным в очереди: «Повторить» или «Пропустить».</li></ol>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ЖУРНАЛ ============ -->
+<section class="page hidden" id="page-edits"><div class="card" id="editsCard"></div></section>
+
+<section class="page hidden" id="page-log">
+  <div class="row">
+    <input id="logSearch" placeholder="Поиск: код товара, сайт…" style="flex:1;max-width:360px">
+    <label class="switch small"><input type="checkbox" id="logErrOnly"> только ошибки</label>
+  </div>
+  <pre class="log" id="logBox"></pre>
+</section>
+
+<!-- ============ НАСТРОЙКИ ============ -->
+<section class="page hidden" id="page-settings">
+  <div class="grid">
+    <div class="card">
+      <h3>Программа</h3>
+      <label class="switch"><input type="checkbox" id="autostart"> 🚀 Запускать вместе с Windows (в фоне, браузер — сразу с расширением)</label>
+      <div class="small muted">Окно программы можно закрывать — работа продолжается в фоне. Открыть снова: ярлык «Donini Poster» на рабочем столе.</div>
+      <div class="row">
+        <button id="restartBrowser" title="Закрыть и открыть браузер с расширением и фоновым режимом (вкладки вернутся)">🔄 Перезапустить браузер</button>
+        <button id="quitBtn" class="danger">⏻ Выключить программу</button>
+      </div>
+      <button id="exportBtn" title="Архив программы без ваших ключей, очереди и журнала — со всеми записанными сценариями сайтов">📦 Сделать копию для другого человека</button>
+    </div>
+    <div class="card">
+      <h3>⬆ Обновления</h3>
+      <div id="updInfo" class="small muted">…</div>
+      <label class="field">Где лежат обновления (GitHub: владелец/репозиторий)<input id="updRepo" placeholder="например donini/donini-poster"></label>
+      <div class="row"><button id="updSave" class="sm">Сохранить</button><button id="updCheck" class="sm primary">Проверить сейчас</button></div>
+    </div>
+    <div class="card">
+      <h3>🌐 Браузер с расширением</h3>
+      <label class="field">В каком браузере работают доски (расширение Donini)
+        <select id="ubSel"><option value="auto">Автоматически</option></select></label>
+      <div id="ubInfo" class="small muted"></div>
+      <div class="small muted">«Автоматически»: браузер по умолчанию в Windows; если он не подходит (Firefox) — тот, где замечено расширение. Подходят Яндекс, Chrome, Edge, Brave, Opera, Vivaldi (Firefox — нет).</div>
+    </div>
+    <div class="card">
+      <h3>Коды и время</h3>
+      <label class="field">Последний использованный код (следующий будет +1)<input id="s_counter" type="number"></label>
+      <label class="switch"><input type="checkbox" id="s_shared"> один общий счётчик кодов для всех видов товара</label>
+      <div class="row">
+        <label class="field">Выставлять с (час)<input id="s_h1" type="number" class="tiny" min="0" max="23"></label>
+        <label class="field">до (час)<input id="s_h2" type="number" class="tiny" min="1" max="24"></label>
+      </div>
+      <label class="field">Удалять фото выставленных через, дней (0 — не удалять)<input id="s_del" type="number" class="tiny"></label>
+      <label class="field">Макс. размер фото, px<input id="s_px" type="number" class="mini"></label>
+    </div>
+    <div class="card">
+      <h3>🤖 Бренд по фото (ИИ)</h3>
+      <div class="small muted">Если поставщик не написал бренд в описании, ИИ (Claude) смотрит на фото и ставит бренд сам — при скачивании из WeChat
+        и кнопкой «🤖 Бренд по фото» у выбранных товаров в очереди. Нужен свой ключ Claude API: console.anthropic.com → API Keys
+        (там же пополнить счёт; одно фото стоит доли цента). Ключ вписывайте только сюда.</div>
+      <label class="field">Ключ Claude API<input id="s_ai" type="password" autocomplete="off" placeholder="sk-ant-…"></label>
+      <div class="row"><label class="switch small"><input type="checkbox" id="s_aion"> распознавать бренд по фото</label><span id="s_aiinfo" class="small"></span>
+        <button class="sm" id="s_aiclear">Удалить ключ</button></div>
+    </div>
+    <div class="card">
+      <h3>Курсы валют (за 1 зл)</h3>
+      <div class="row">
+        <label class="field">EUR<input id="r_EUR" class="mini"></label>
+        <label class="field">HUF<input id="r_HUF" class="mini"></label>
+        <label class="field">RON<input id="r_RON" class="mini"></label>
+        <label class="field">CZK<input id="r_CZK" class="mini"></label>
+      </div>
+      <span class="small muted">Цены округляются вверх: …9, CZK …90, HUF …990.</span>
+    </div>
+    <div class="card">
+      <h3>Уведомления в Telegram</h3>
+      <label class="field">Токен бота<input id="tg_token" placeholder="123456:ABC..."></label>
+      <div class="row">
+        <label class="field" style="flex:1">Chat id<input id="tg_chat"></label>
+        <button id="tgFind" class="sm" style="align-self:flex-end">Найти chat id</button>
+        <button id="tgTest" class="sm" style="align-self:flex-end">Проверить</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Папки и браузер</h3>
+      <label class="field">Папка очереди<input id="s_queue"></label>
+      <label class="field">Папка «Выставлено»<input id="s_done"></label>
+      <label class="field">Прокси для браузера программы (необязательно)<input id="s_proxy" placeholder="socks5://адрес:порт"></label>
+      <label class="field">Браузер для фоновых сайтов
+        <select id="s_channel"><option value="chrome">Мой Chrome (рекомендуется)</option><option value="yandex">Яндекс Браузер</option><option value="msedge">Microsoft Edge</option><option value="">Встроенный Chromium</option></select>
+      </label>
+      <button id="openProgBrowser" class="sm">Открыть браузер программы (поставить VPN-расширение)</button>
+    </div>
+    <div class="card">
+      <h3>Шаблоны из Donini Manager</h3>
+      <span class="small muted">В Donini нажмите «Скопировать мои шаблоны текста» и вставьте код сюда. В тексте можно писать <b>{size}</b>.</span>
+      <textarea id="tplCode" rows="3" placeholder="PLT-ШАБЛОНЫ-1:..."></textarea>
+      <button id="tplImport" class="sm">Импортировать</button>
+    </div>
+    <div class="card">
+      <h3>Расширение для браузера</h3>
+      <div id="extInfo" class="small"></div>
+      <span class="small muted">Расширение включается само, когда программа запускает браузер. Если его нет: chrome://extensions → «Режим разработчика» → «Загрузить распакованное» → папка <b>extension</b>.</span>
+      <button id="openExtFolder" class="sm">📂 Папка расширения</button>
+    </div>
+  </div>
+  <div class="row"><button id="saveSettings" class="primary big">Сохранить настройки</button></div>
+</section>
+</main>
+</div>
+
+<div id="modalRoot"></div>
+<input type="file" id="dirPick" webkitdirectory multiple class="hidden">
+
+<script>
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+const setHTML = (el, html) => { if(el && el.__h !== html){ el.innerHTML = html; el.__h = html; return true; } return false; };
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let S = null, META = null, page = "home", linesDraft = null;
+let EXT = {ok:false, version:null, pub:null, auto:null, batch:null, pstate:null};
+let showHist = false;
+
+async function api(path, opts={}){
+  const r = await fetch(path, {headers:{"Content-Type":"application/json"}, ...opts,
+    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined});
+  if(!r.ok){ let m = r.statusText; try{ m = (await r.json()).detail || m; }catch(e){} alert(m); throw new Error(m); }
+  return r.json();
+}
+const post = (p, b={}) => api(p, {method:"POST", body:b});
+
+// ---------- связь с расширением (оно заполняет объявления на досках в браузере) ----------
+// Окно программы — отдельное приложение; команды расширению идут через программу.
+async function ext(msg, timeout=15000){
+  try{
+    const r = await (await fetch("/api/bridge/cmd", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({msg, timeout: Math.round(timeout/1000)})})).json();
+    return r.ok ? r.result : (r.offline ? null : {ok:false, error:r.error});
+  }catch(e){ return null; }
+}
+async function loadExt(){
+  let st = null;
+  try{ st = await (await fetch("/api/bridge/status")).json(); }catch(e){}
+  if(!st || !st.online){ EXT.ok = false; EXT.version = null; EXT.auto = null; EXT.batch = null; return; }
+  const r = await ext({type:"status"}, 8000);
+  if(!r || r.ok === false){ EXT.ok = false; EXT.version = st.version; return; }
+  EXT.ok = true; EXT.version = r.version; EXT.pub = r.pub; EXT.auto = r.auto; EXT.openPids = r.openPids || []; EXT.batch = r.batch;
+}
+const extMark = () => EXT.ok;
+function openExt(url){ const a = document.createElement("a"); a.href = url; a.target = "_blank"; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove(); }
+
+// ---------- страницы ----------
+const TITLES = {edits:"Исправить объявления", help:"Инструкция", home:"Главная", site:"Мой сайт", boards:"Доски объявлений", photos:"Скачать фото", manager:"Donini Manager", sites:"Сайты и сценарии", lines:"Виды товара", insta:"Instagram", log:"Журнал", settings:"Настройки"};
+function go(p){
+  page = p;
+  $$(".nav").forEach(b => b.classList.toggle("active", b.dataset.page === p));
+  $$("main > section").forEach(s => s.classList.toggle("hidden", s.id !== "page-" + p));
+  $("#pageTitle").textContent = TITLES[p];
+  try{ localStorage.setItem("page", p); }catch(e){}
+  if(p === "settings"){ loadSettings(); updLoad(false); }
+  if(p === "lines"){ linesDraft = null; renderLines(); }
+  if(p === "site") wooLoad();
+  if(p === "photos") loadPhotosPage();
+  if(p === "manager") openManagerTpl(null, true);
+  if(p === "edits") editsPage();
+  if(p === "manager" || p === "boards" || p === "site") api("/api/meta").then(m => { META = m; }).catch(() => {});
+  render(true);
+}
+$$(".nav").forEach(b => b.onclick = () => go(b.dataset.page));
+document.addEventListener("click", e => { const g = e.target.closest("[data-goto]"); if(g) go(g.dataset.goto); });
+function editing(id){
+  const a = document.activeElement;
+  return a && a.closest && a.closest("#" + id) && ["INPUT","SELECT","TEXTAREA"].includes(a.tagName) && !["checkbox","radio"].includes(a.type);
+}
+
+// ---------- шапка ----------
+function renderHeader(){
+  $("#toggleBtn").textContent = S.paused ? "▶ Фон: старт" : "⏸ Фон: пауза";
+  $("#toggleBtn").className = S.paused ? "go" : "";
+  $("#recPill").classList.toggle("hidden", !S.recording);
+  const wh = $("#whPill");
+  wh.classList.toggle("hidden", S.paused || S.work_hours_now);
+  wh.textContent = `⏰ ждёт рабочих часов (${S.work_hours[0]}:00–${S.work_hours[1]}:00)`;
+  $("#counter").textContent = S.counter;
+  $("#verInfo").textContent = "версия " + S.version;
+  const ep = $("#extPill");
+  if(EXT.ok){ ep.className = "pill on"; ep.innerHTML = `<span class="dot"></span>расширение v${esc(EXT.version)}`; }
+  else { ep.className = "pill bad"; ep.innerHTML = `<span class="dot"></span>нет расширения`; }
+  const b = $("#extBanner");
+  b.innerHTML = EXT.ok || !extChecked ? "" :
+    `<div class="banner err" style="margin-bottom:14px">⚠️ <b>Расширение Donini в браузере не отвечает</b> — доски не выставляются (мой сайт работает).
+     Обычно помогает перезапуск браузера с расширением. <button class="sm" id="bnRestart">🔄 Перезапустить браузер с расширением</button> <button class="sm" id="bnHelp">❓ Как починить</button></div>`;
+  const br = $("#bnRestart"); if(br) br.onclick = restartBrowser;
+  const bh = $("#bnHelp"); if(bh) bh.onclick = () => extHelpModal("");
+  // счётчики в меню
+  const act = S.products.filter(p => p.status !== "archived");
+  const nSite = act.filter(p => p.line === "site").length, nBoards = act.filter(p => p.line !== "site").length;
+  const nErr = act.filter(p => Object.values(p.sites).some(x => x.status === "error")).length;
+  const setB = (id, n, cls="") => { const e = $(id); e.textContent = n; e.className = "badge " + cls + (n ? "" : " hidden"); };
+  setB("#bSite", nSite); setB("#bBoards", nBoards); setB("#bLog", nErr, "err");
+  $("#sideFoot").innerHTML = `${S.paused ? "⏸ фоновые сайты на паузе" : "● программа работает"}<br>${S.telegram_ok ? "✓ Telegram подключён" : "Telegram не подключён"}`;
+}
+$("#toggleBtn").onclick = async () => { await post("/api/pause", {paused: !S.paused}); refresh(); };
+$("#openQueueBtn").onclick = () => post("/api/open_folder", {});
+
+// ---------- главная ----------
+function renderHome(){
+  const act = S.products.filter(p => p.status !== "archived");
+  const boards = act.filter(p => p.line !== "site");
+  const errs = act.filter(p => Object.values(p.sites).some(x => x.status === "error"));
+  const today = S.sites.reduce((a, s) => a + (s.today || 0), 0);
+  const W = WOO || {};
+  setHTML($("#homeTiles"), `
+    <div class="tile"><div class="t">Мой сайт — в очереди</div><div class="n">${W.left ?? "—"}</div><div class="s">загружено всего: ${W.done ?? "—"}</div></div>
+    <div class="tile"><div class="t">Доски — в очереди</div><div class="n">${boards.length}</div><div class="s">товаров ждут выставления</div></div>
+    <div class="tile"><div class="t">Сегодня выставлено</div><div class="n">${today}</div><div class="s">на всех сайтах</div></div>
+    <div class="tile" style="${errs.length ? "border-color:var(--err)" : ""}"><div class="t">Ошибки</div><div class="n" style="${errs.length ? "color:var(--err)" : ""}">${errs.length}</div><div class="s">${errs.length ? `<a href="#" data-goto="boards" style="color:var(--err)" onclick="$('#qStateFilter').value='error'">показать →</a>` : "всё чисто"}</div></div>`);
+  $("#homeSiteCard").className = "card" + (W.running ? " on" : "");
+  setHTML($("#homeSiteCard"), `<h3><span>🌐 Мой сайт — doninisklep.com</span>${W.running ? `<span class="pill on"><span class="dot"></span>загружает</span>` : `<span class="pill">остановлен</span>`}</h3>
+    <div class="muted">${W.running && W.status ? esc(W.status) : `В очереди: <b>${W.left ?? 0}</b> · загружено: <b>${W.done ?? 0}</b>${W.errors ? ` · <span class="warn">ошибок: ${W.errors}</span>` : ""}`}</div>
+    <div class="row"><button class="${W.running ? "stop" : "go"}" id="hWoo">${W.running ? "■ Остановить" : "▶ Загружать на сайт"}</button><button data-goto="site">Открыть →</button></div>`);
+  $("#hWoo").onclick = wooToggle;
+  const A = EXT.auto, B = EXT.batch;
+  $("#homeBoardsCard").className = "card" + (A || B ? " on" : "");
+  setHTML($("#homeBoardsCard"), `<h3><span>📦 Доски объявлений</span>${A ? `<span class="pill on"><span class="dot"></span>авто-режим</span>` : B ? `<span class="pill on"><span class="dot"></span>пачка</span>` : `<span class="pill">остановлено</span>`}</h3>
+    <div class="muted">${!EXT.ok ? "Расширение не отвечает — см. сообщение вверху." : A ? autoLine() : B ? `Пачка: ${esc(B.lineName)} → ${esc(B.siteName)}, ${B.done || 0} из ${B.target}` : `Ждут выставления: <b>${boards.length}</b>. Режим: ${EXT.pub && EXT.pub.mode === "auto" ? "🤖 без меня" : "🙋 с моим участием"}.`}</div>
+    <div class="row">${EXT.ok ? (A ? `<button class="stop" id="hAuto">■ Остановить авто-режим</button>` : `<button class="go" id="hAuto" ${boards.length ? "" : "disabled"}>▶ Выставлять подряд</button>`) : ""}<button data-goto="boards">Открыть →</button></div>`);
+  const ha = $("#hAuto"); if(ha) ha.onclick = A ? autoStop : autoStart;
+  setHTML($("#homeSites"), siteChips(S.sites.filter(s => s.enabled)));
+  const logs = S.logs.slice(-14).reverse();
+  setHTML($("#homeLog"), logs.map(l => `<div class="logline ${logCls(l)}">${esc(l)}</div>`).join("") || `<span class="muted">пока пусто</span>`);
+}
+const logCls = (l) => /❌|⚠️|Ошибка|ошибк/.test(l) ? (/❌|Ошибка/.test(l) ? "e" : "w") : (/✅/.test(l) ? "o" : "");
+function siteChips(list){
+  return list.map(s => {
+    if(s.type === "manual" || s.type === "ext"){
+      const A = EXT.auto, B = EXT.batch;
+      const busy = B && B.site === s.id;
+      return `<span class="chip ${busy ? "running" : ""}" title="Заполняет расширение в вашем браузере">${esc(s.name)}: ${busy ? "пачка" : A ? "авто" : "в браузере"} · сегодня ${s.today}</span>`;
+    }
+    const noSc = s.type !== "plugin" && !Object.values(s.scenarios).some(n => n > 0);
+    const st = noSc ? "нет сценария" : s.status;
+    const cls = /выставляет|загружа/.test(st) ? "running" : noSc ? "error" : /ждёт товары|пауза \d/.test(st) ? "" : "done";
+    return `<span class="chip ${cls}" title="${esc(st)}">${esc(s.name.replace(/\s*\(.*\)/, ""))}: ${esc(st)}</span>`;
+  }).join("") || `<span class="muted">нет включённых сайтов</span>`;
+}
+
+// ---------- доски: авто-режим, пачка, публикация ----------
+function autoLine(){
+  const A = EXT.auto; if(!A) return "";
+  const wu = A.waitUntil && A.waitFor === A.pid ? A.waitUntil : 0;
+  const left = Math.round((wu - Date.now()) / 1000);
+  return `${A.lineName ? `Очередь «${esc(A.lineName)}». ` : ""}Открыто товаров: ${A.count || 1}. ${left > 0 ? `⏳ следующий через ${Math.floor(left/60)}:${String(left%60).padStart(2,"0")}` : "⚙️ идёт выставление…"}`;
+}
+async function pickNext(){
+  const st = await ext({type:"popupState"});
+  if(!st || !st.products) { alert("Расширение не ответило."); return null; }
+  const ps = st.products.filter(p => p.line !== "site");
+  if(!ps.length){ alert("Для досок нет товаров в очереди."); return null; }
+  const open = EXT.openPids || [];
+  let best = -1;
+  ps.forEach((p, k) => { if(!open.includes(p.id) && (best < 0 || p.sites.length > ps[best].sites.length)) best = k; });
+  return ps[best >= 0 ? best : 0];
+}
+async function autoStart(){
+  const p = await pickNext(); if(!p) return;
+  const r = await ext({type:"autoStart", pid: p.id, sites: p.sites.map(s => s.id)}, 30000);
+  if(!r || r.ok === false) alert("Не получилось запустить: " + ((r && r.error) || "расширение не ответило"));
+  await loadExt(); render(true);
+}
+async function autoStop(){ await ext({type:"autoStop"}); await loadExt(); render(true); }
+// «▶ Выставлять» на плитке очереди: авто-режим только по этой очереди (виду товара)
+async function autoStartLine(lineId){
+  const l = S.lines.find(x => x.id === lineId); if(!l) return;
+  if(!EXT.ok) return alert("Расширение в браузере не отвечает.");
+  if(EXT.auto && EXT.auto.line === lineId){ await autoStop(); return; }
+  const st = await ext({type:"popupState"});
+  const ps = ((st && st.products) || []).filter(p => p.line === lineId);
+  if(!ps.length) return alert(`В очереди «${l.name}» нет товаров, которые ждут выставления на включённые сайты.`);
+  const sites = [...new Set(ps.flatMap(p => p.sites.map(s => s.id)))];
+  if(EXT.auto){
+    if(!confirm(`Сейчас идёт авто-режим${EXT.auto.lineName ? ` («${EXT.auto.lineName}»)` : ""}.\n\nПереключить его на очередь «${l.name}»? Текущий товар доделается, дальше пойдут только «${l.name}».`)) return;
+    const r = await ext({type:"autoSetLine", line: lineId, lineName: l.name, sites});
+    if(!r || r.ok === false) alert("Не получилось: " + ((r && r.error) || "расширение не ответило"));
+  } else {
+    const p = ps[0];
+    const r = await ext({type:"autoStart", pid: p.id, sites: p.sites.map(s => s.id), allSites: sites, line: lineId, lineName: l.name}, 30000);
+    if(!r || r.ok === false) alert("Не получилось запустить: " + ((r && r.error) || "расширение не ответило"));
+  }
+  toast(`▶ Выставляю очередь «${l.name}»`);
+  await loadExt(); render(true);
+}
+async function savePub(patch){ EXT.pub = await ext({type:"pubSet", ...patch}); renderPub(); }
+
+function renderBoardsControls(){
+  if(editing("page-boards") && document.activeElement.closest("#autoCard,#batchCard,#pubCard")) return;
+  const A = EXT.auto, B = EXT.batch, P = EXT.pub || {mode:"manual"};
+  const nBoards = S.products.filter(p => p.status !== "archived" && p.line !== "site").length;
+  const ac = $("#autoCard");
+  ac.className = "card" + (A ? " on" : "");
+  const acChanged = setHTML(ac, !EXT.ok ? `<h3>▶ Авто-выставление</h3><div class="muted">Нужно расширение Donini — см. сообщение вверху.</div>` :
+    `<h3><span>▶ Авто-выставление</span>${A ? `<span class="pill on"><span class="dot"></span>работает</span>` : `<span class="pill">остановлено</span>`}</h3>
+     <div class="muted">${A ? autoLine() : `Товар за товаром на все его сайты. Ждут: <b>${nBoards}</b>.`}</div>
+     <div class="row">${A ? `<button class="stop big" id="aStop">■ Остановить</button>` : `<button class="go big" id="aGo" ${nBoards ? "" : "disabled"}>▶ Выставлять подряд</button>`}
+       <div class="seg"><button data-mode="manual" class="${P.mode !== "auto" ? "on" : ""}">🙋 С моим участием</button><button data-mode="auto" class="${P.mode === "auto" ? "on" : ""}">🤖 Без меня</button></div></div>
+     <div class="small muted">${P.mode === "auto" ? "Программа сама жмёт «Опубликовать». Если на сайте что-то сломалось — сайт пропускается, сообщение придёт в Telegram." : "Программа заполняет, «Опубликовать» нажимаете вы."}</div>`);
+  if(acChanged){
+  if($("#aGo")) $("#aGo").onclick = autoStart;
+  if($("#aStop")) $("#aStop").onclick = autoStop;
+  $$("#autoCard [data-mode]").forEach(b => b.onclick = () => savePub({mode: b.dataset.mode}).then(() => render(true)));
+  }
+  // пачка
+  const bc = $("#batchCard");
+  bc.className = "card" + (B ? " on" : "");
+  if(!EXT.ok){ bc.innerHTML = `<h3>📦 Пачкой на один сайт</h3><div class="muted">Нужно расширение Donini.</div>`; return; }
+  if(B){
+    const ch = setHTML(bc, `<h3><span>📦 Пачка: ${esc(B.lineName)} → ${esc(B.siteName)}</span><span class="pill on"><span class="dot"></span>идёт</span></h3>
+      <div class="muted">Выставлено ${B.done || 0} из ${B.target}${B.skipped ? `, пропущено ${B.skipped}` : ""}. Следующий товар откроется сам.</div>
+      <div class="row"><button class="stop big" id="bStop">■ Остановить пачку</button>
+      <label class="field">Пауза, сек<input id="bPause" class="tiny" type="number" min="0" value="${esc(String(P.batchPause ?? 15))}"></label></div>`);
+    if(!ch) return;
+    $("#bStop").onclick = async () => { await ext({type:"batchStop"}); await loadExt(); render(true); };
+  } else {
+    const lines = S.lines.filter(l => (l.sites || []).length && l.id !== "site");
+    const extSites = S.sites.filter(s => s.type === "ext" || s.type === "manual");
+    let bl = null; try{ bl = localStorage.getItem("bLine"); }catch(e){}
+    const line = lines.find(l => l.id === bl) || lines[0];
+    if(!line){ bc.innerHTML = `<h3>📦 Пачкой на один сайт</h3><div class="muted">Нет видов товара с сайтами.</div>`; return; }
+    const act = S.products.filter(p => p.status !== "archived" && p.line === line.id);
+    const left = (sid) => act.filter(p => p.sites[sid] && ["pending","error"].includes(p.sites[sid].status)).length;
+    const lsites = line.sites.filter(sid => extSites.some(s => s.id === sid));
+    let bs = null; try{ bs = localStorage.getItem("bSite"); }catch(e){}
+    const cur = lsites.includes(bs) && left(bs) ? bs : (lsites.find(sid => left(sid)) || lsites[0]);
+    const nm = (sid) => (S.sites.find(s => s.id === sid) || {}).name || sid;
+    const ch = setHTML(bc, `<h3>📦 Пачкой на один сайт</h3>
+      <div class="row">
+        <label class="field">Товар<select id="bLine">${lines.map(l => `<option value="${esc(l.id)}" ${l.id === line.id ? "selected" : ""}>${esc(l.name)}</option>`).join("")}</select></label>
+        <label class="field" style="flex:1">Сайт<select id="bSite">${lsites.map(sid => `<option value="${esc(sid)}" ${sid === cur ? "selected" : ""}>${esc(nm(sid))} — ждут: ${left(sid)}</option>`).join("")}</select></label>
+      </div>
+      <div class="row">
+        <label class="field">Сколько, шт<input id="bCount" class="tiny" type="number" min="1" value="${esc((()=>{try{return localStorage.getItem("bCount_" + line.id)}catch(e){return null}})() || 10)}"></label>
+        <label class="field">Пауза, сек<input id="bPause" class="tiny" type="number" min="0" value="${esc(String(P.batchPause ?? 15))}"></label>
+        <button class="go" id="bGo" style="align-self:flex-end" ${lsites.length ? "" : "disabled"}>▶ Выставить пачкой</button>
+      </div>
+      <div class="small muted">Откроется одна вкладка сайта, после публикации там же откроется следующий товар. Работает вместе с авто-режимом.</div>`);
+    if(!ch) return;
+    $("#bLine").onchange = (e) => { try{ localStorage.setItem("bLine", e.target.value); }catch(er){} render(true); };
+    $("#bSite").onchange = (e) => { try{ localStorage.setItem("bSite", e.target.value); }catch(er){} };
+    $("#bGo").onclick = async () => {
+      const ln = $("#bLine").value, site = $("#bSite").value, n = Number($("#bCount").value) || 10;
+      try{ localStorage.setItem("bCount_" + ln, String(n)); localStorage.setItem("bSite", site); }catch(er){}
+      $("#bGo").disabled = true; $("#bGo").textContent = "Открываю…";
+      const r = await ext({type:"batchStart", line: ln, site, target: n}, 30000);
+      if(!r || r.ok === false) alert((r && r.error) || "Расширение не ответило");
+      await loadExt(); render(true);
+    };
+  }
+  const bp = $("#bPause"); if(bp) bp.onchange = (e) => savePub({batchPause: Math.max(0, Math.round(Number(e.target.value) || 0))});
+}
+function renderPub(){
+  if(editing("pubCard")) return;
+  const P = EXT.pub;
+  const ch = setHTML($("#pubBox"), !P ? `<span class="muted">Нужно расширение Donini.</span>` : `
+    <div class="row">
+      <label class="field">Пауза между товарами, мин<input id="pInt" class="tiny" type="number" min="0" max="60" step="0.5" value="${esc(String((P.interval || 0) / 60))}"></label>
+      <label class="field">Случайный разброс, ±%<input id="pJit" class="tiny" type="number" min="0" max="90" step="5" value="${esc(String(P.jitter ?? 20))}"></label>
+    </div>
+    <label class="switch"><input type="checkbox" id="pAlways" ${P.always ? "checked" : ""}> паузу делать и в режиме «с моим участием»</label>
+    <label class="switch"><input type="checkbox" id="pBg" ${P.background !== false ? "checked" : ""}> 🪟 работать в фоне — выставление в отдельном окне позади, меня на вкладки не переключать</label>
+    <div class="small muted">Например 1.5 мин ±20% — каждый раз от 1:12 до 1:48, чтобы сайты не видели одинаковых промежутков. Окно выставления не сворачивайте.</div>`);
+  if(!P || !ch) return;
+  $("#pInt").onchange = (e) => savePub({interval: Math.max(0, Math.round((Number(String(e.target.value).replace(",", ".")) || 0) * 60))});
+  $("#pJit").onchange = (e) => savePub({jitter: Math.max(0, Math.min(90, Number(e.target.value) || 0))});
+  $("#pAlways").onchange = (e) => savePub({always: e.target.checked});
+  $("#pBg").onchange = (e) => savePub({background: e.target.checked});
+}
+
+// ---------- очереди (сайт и доски) ----------
+const STATUS_RU = {pending:"ждёт", running:"выставляет", done:"✓", error:"ошибка", skipped:"пропуск"};
+// шаблоны текста: список для выбора (свои шаблоны из Donini Manager — тоже здесь)
+const tplLabel = (id) => { const t = (META.types || []).find(x => x.id === id); return t ? t.label : (id || "—"); };
+const tplOpts = (cur) => (META.types || []).map(t => `<option value="${esc(t.id)}" ${t.id === cur ? "selected" : ""}>${esc(t.label)}${t.custom ? " (свой)" : ""}</option>`).join("");
+const effTpl = (p) => p.template || ((S.lines.find(l => l.id === p.line) || {}).template) || "";
+function renderQueue(siteMode){
+  const box = siteMode ? $("#qSite") : $("#qBoards");
+  if(editing(siteMode ? "qSite" : "qBoards")) return;
+  if(!siteMode){
+    setHTML($("#siteStrip"), siteChips(S.sites.filter(s => s.enabled && s.id !== "doninisklep")));
+    if(document.activeElement !== $("#qcLevel")) $("#qcLevel").value = (S.photo_qc || "normal");
+    // бренд в объявлении — отдельно для каждого сайта (нажать — переключить)
+    const bs = S.sites.filter(s => s.enabled && s.id !== "doninisklep");
+    setHTML($("#brandStrip"), bs.length ? `<span class="small muted">Бренд в объявлении:</span>` + bs.map(s => `<button class="chip brandsite ${s.title_brand ? "on" : "off"}" data-brandsite="${esc(s.id)}"
+        title="${s.title_brand ? "На этом сайте бренд пишется в название (и в описание, если он есть в шаблоне). Нажмите — выставлять сюда БЕЗ бренда" : "На этом сайте бренд НЕ пишется. Нажмите — выставлять сюда С брендом"}">${esc(s.name.replace(/\s*\(.*\)/, ""))}: ${s.title_brand ? "🏷 с брендом" : "🚫 без бренда"}</button>`).join("") : "");
+    const lf = $("#qLineFilter"), cur = lf.value;
+    lf.innerHTML = `<option value="">все виды товара</option>` + S.lines.filter(l => l.id !== "site").map(l => `<option value="${esc(l.id)}">${esc(l.name)}</option>`).join("");
+    lf.value = cur;
+  }
+  const sites = Object.fromEntries(S.sites.map(s => [s.id, s]));
+  const lines = Object.fromEntries(S.lines.map(l => [l.id, l]));
+  const lineF = siteMode ? "" : $("#qLineFilter").value, stF = siteMode ? "" : $("#qStateFilter").value;
+  const rows = S.products.filter(p => (showHist || p.status !== "archived") && (p.line === "site") === siteMode
+    && (!lineF || p.line === lineF) && (!stF || Object.values(p.sites).some(x => x.status === "error")));
+  if(!rows.length){
+    setHTML(box, `<div class="empty">${stF ? "Ошибок нет 🎉" : siteMode ? "Очередь сайта пуста. Положите папки товаров в «Очередь сайта» — они появятся здесь через пару секунд." : "Очередь пуста. Скачайте каталог товара в папку вида товара внутри «Очередь» (например Очередь\\Сумки\\)."}</div>`);
+    return;
+  }
+  const shown = rows.slice(0, 300);
+  const tpl = (l) => { const t = META.types.find(x => x.id === (l || {}).template); return t ? t.label : ((l || {}).template || "—"); };
+  const allSel = shown.length && shown.every(p => SEL.has(p.id));
+  renderBulk(siteMode, rows);
+  const usedLines = [...new Set(rows.filter(p => p.status !== "archived").map(p => p.line))].map(id => lines[id]).filter(Boolean);
+  const tplBar = usedLines.length ? `<div class="tplbar"><span class="small muted">Шаблон текста:</span>${usedLines.map(l => `<span class="tplitem"><b>${esc(l.name)}</b>
+      <select data-linetpl="${esc(l.id)}" title="Шаблон текста для всех товаров «${esc(l.name)}»">${tplOpts(l.template)}</select>
+      <button class="sm" data-mgrtpl="${esc(l.template)}" title="Открыть этот шаблон в Donini Manager и поправить текст">✏️</button></span>`).join("")}</div>` : "";
+  setHTML(box, `${tplBar}${rows.length > 300 ? `<div class="small muted" style="margin-bottom:6px">Показаны первые 300 из ${rows.length}</div>` : ""}<table><thead><tr><th style="width:26px"><input type="checkbox" data-selall="${siteMode ? 1 : 0}" ${allSel ? "checked" : ""} title="Выбрать все. Подсказка: отметьте один товар, потом с Shift — другой: выберутся все между ними"></th><th></th><th>Код</th><th>Товар</th><th>Размер / модель</th><th>Цена, зл</th><th>Сайты</th><th></th></tr></thead><tbody>${
+    shown.map(p => {
+      const chips = Object.entries(p.sites).map(([sid, st]) => {
+        const name = sites[sid] ? sites[sid].name.replace(/\s*\(.*\)/, "") : sid;
+        const tip = st.error ? esc(st.error) : (st.url ? esc(st.url) : STATUS_RU[st.status]);
+        const withBrand = sites[sid] && sites[sid].title_brand && !p.no_brand && sid !== "doninisklep";
+        const label = `${esc(name.split(".")[0])}${withBrand ? " 🏷" : ""} ${st.status === "done" ? "✓" : st.status === "error" ? "!" : ""}`;
+        return `<span class="chip ${st.status}" title="${tip}" data-act="chip" data-pid="${p.id}" data-site="${sid}">${label}</span>`;
+      }).join("");
+      const archived = p.status === "archived";
+      const hasErr = Object.values(p.sites).some(s => s.status === "error");
+      return `<tr class="${SEL.has(p.id) ? "selrow" : ""}">
+        <td><input type="checkbox" data-sel="${p.id}" ${SEL.has(p.id) ? "checked" : ""}></td>
+        <td><img class="thumb" loading="lazy" src="/api/thumb?path=${encodeURIComponent(p.photos[0]||"")}" data-act="photos" data-pid="${p.id}" style="cursor:zoom-in" title="Посмотреть фото (можно убрать лишние)"></td>
+        <td><span class="code">${esc(p.code)}</span></td>
+        <td style="max-width:340px"><a data-act="card" data-pid="${p.id}" style="cursor:pointer">${esc(p.name)}</a>
+          <div class="small muted">${esc(lines[p.line]?.name || p.line)} · ${archived ? `🧾 ${esc(tplLabel(effTpl(p)))}` : `<select class="tplsel${p.template ? " own" : ""}" data-tpl="${p.id}" title="Шаблон текста объявления для этого товара">
+              <option value="">🧾 ${esc(tplLabel(lines[p.line]?.template))} — как у «${esc(lines[p.line]?.name || "")}»</option>
+              ${(META.types || []).filter(t => t.id !== lines[p.line]?.template).map(t => `<option value="${esc(t.id)}" ${t.id === p.template ? "selected" : ""}>🧾 ${esc(t.label)}${t.custom ? " (свой)" : ""}</option>`).join("")}</select>`} · ${p.photos.length} фото${p.qc_bad && Object.keys(p.qc_bad).length ? ` · <span class="qcbadge" title="${esc(Object.entries(p.qc_bad).map(([f, r]) => f.split(/[\\/]/).pop() + ": " + r).join("\n"))}">🧹 убрано плохих фото: ${Object.keys(p.qc_bad).length}</span>` : p.photos_locked ? " · фото выбраны" : ""}${p.photos_manual ? ` · <span class="ok" title="Фото выбраны вами в карточке — автопроверка их не трогает">✋ проверено вручную</span>` : ""}${p.texts && Object.keys(p.texts).length ? ` · <span class="warn" title="Текст поправлен вручную — шаблон к нему не применяется. «↺ Тексты по шаблону» — вернуть шаблон">✏️ свой текст</span>` : ""}
+            ${archived ? (p.no_brand ? " · без бренда" : "") : `<button class="sm brandtg ${p.no_brand ? "off" : "on"}" data-act="brand" data-pid="${p.id}" title="${p.no_brand ? "Этот товар — БЕЗ бренда на всех сайтах. Нажмите — включить бренд (на сайтах с 🏷)" : "С брендом на: " + (Object.keys(p.sites).filter(k => sites[k] && sites[k].title_brand && k !== "doninisklep").map(k => sites[k].name).join(", ") || "— ни на одном (включите 🏷 у сайта сверху)") + ". Нажмите — этот товар везде без бренда"}">${p.no_brand ? "🚫 без бренда" : "🏷 с брендом" + (p.brand ? ": " + esc(p.brand) : "")}</button>`}</div></td>
+        <td>${archived ? esc(p.size) : `<input class="mini" data-edit="size" data-pid="${p.id}" value="${esc(p.size)}">`}</td>
+        <td>${archived ? esc(p.price) : `<input class="tiny${!(+p.price > 0) ? " noprice" : ""}" data-edit="price" data-pid="${p.id}" value="${esc(p.price || "")}" ${!(+p.price > 0) ? `placeholder="цена!" title="Нет цены — без неё товар на доски не пойдёт"` : ""}>`}</td>
+        <td><div class="chips">${chips}</div></td>
+        <td style="white-space:nowrap;text-align:right">${archived ? `<span class="small muted">готово</span>` : `
+          ${hasErr ? `<button class="sm primary" data-act="retry" data-pid="${p.id}">Повторить</button>` : ""}
+          <button class="sm" data-act="card" data-pid="${p.id}" title="Карточка товара: фото, бренд, вид товара, сайты">🗂</button>
+          <button class="sm${p.texts && Object.keys(p.texts).length ? " primary" : ""}" data-act="texts" data-pid="${p.id}" title="Посмотреть и поправить название и описание">✏️</button>
+          <button class="sm" data-act="folder" data-path="${esc(p.folder)}" title="Открыть папку">📂</button>
+          <button class="sm danger" data-act="remove" data-pid="${p.id}" title="Убрать из очереди">✕</button>`}
+        </td></tr>`;
+    }).join("")}</tbody></table>`);
+}
+$$(".showHistory").forEach(c => c.onchange = (e) => { showHist = e.target.checked; $$(".showHistory").forEach(x => x.checked = showHist); refresh(); });
+$("#qLineFilter").onchange = () => render(true);
+$("#qStateFilter").onchange = () => render(true);
+$("#qcLevel").onchange = async (e) => { e.target.blur(); await post("/api/config", {photo_qc: e.target.value}); toast(e.target.value === "off" ? "Проверка фото выключена" : "🧹 Проверка фото: " + e.target.selectedOptions[0].textContent); };
+$("#qcAll").onclick = async () => { if(!confirm("Проверить фото всех товаров в очереди заново?\n\nФото, которые вы выбрали вручную в карточке, не трогаются.")) return; const r = await post("/api/queue/qc_recheck", {}); toast(`🧹 Проверяю фото: ${r.count} товаров`); setTimeout(refresh, 5000); };
+$("#brandStrip").addEventListener("click", async e => {
+  const b = e.target.closest("[data-brandsite]"); if(!b) return;
+  const s = S.sites.find(x => x.id === b.dataset.brandsite); if(!s) return;
+  await post(`/api/site/${encodeURIComponent(s.id)}`, {title_brand: !s.title_brand});
+  toast(`${s.name}: ${!s.title_brand ? "🏷 теперь С брендом" : "🚫 теперь БЕЗ бренда"}`);
+  refresh();
+});
+$("#sizesFromSite").onclick = async () => {
+  const b = $("#sizesFromSite"); b.disabled = true; const old = b.textContent; b.textContent = "📏 Беру размеры с сайта…";
+  try{
+    const ids = [...SEL].filter(id => S.products.some(p => p.id === id && p.line !== "site"));
+    const r = await post("/api/queue/sizes_from_site", {ids});
+    if(!r.candidates) toast("Нет товаров без размера, скачанных с моего сайта");
+    else toast(`📏 Размер подставлен: ${r.done}${r.missing ? ` · не найден на сайте: ${r.missing}` : ""}`, !!r.missing && !r.done);
+  }catch(e){} finally{ b.disabled = false; b.textContent = old; refresh(); }
+};
+$$("[data-tplreset]").forEach(b => b.onclick = async () => {
+  const mode = b.dataset.tplreset, lineF = mode === "boards" ? $("#qLineFilter").value : "";
+  const own = S.products.filter(p => p.status !== "archived" && (p.line === "site") === (mode === "site") && (!lineF || p.line === lineF) && p.texts && Object.keys(p.texts).length);
+  if(!own.length){ toast("✓ Все товары в очереди уже берут текст из шаблона — изменения в Donini Manager применяются к ним сами"); return; }
+  if(!confirm(`У ${own.length} товаров в очереди свой текст (поправлен вручную через ✏️) — поэтому изменения шаблона к ним не применялись.\n\nЗаменить их тексты текущим шаблоном?`)) return;
+  const r = await post("/api/queue/texts_reset", {only: mode, line: lineF});
+  toast(`✓ Тексты по шаблону: ${r.reset} товаров`); refresh();
+});
+$$("[data-clear]").forEach(b => b.onclick = async () => {
+  const mode = b.dataset.clear;
+  const n = S.products.filter(p => p.status !== "archived" && (p.line === "site") === (mode === "site")).length;
+  if(!n){ alert("Очередь и так пуста."); return; }
+  if(!confirm(`Убрать из ${mode === "site" ? "«Очереди сайта»" : "очереди для досок"} все товары (${n} шт.)?\n\nПапки с фото переносятся в «_удалено» внутри папки вида товара. Выставленные товары не затрагиваются.`)) return;
+  const r = await post("/api/queue/clear", {only: mode});
+  if(r && r.failed) alert(`Убрано: ${r.removed}. Не удалось: ${r.failed} — возможно, папка открыта в другой программе.`);
+  refresh();
+});
+for(const id of ["#qSite", "#qBoards"]){
+  $(id).addEventListener("change", async e => {
+    const t = e.target;
+    if(t.dataset.tpl !== undefined){
+      t.blur();
+      try{ await post(`/api/product/${t.dataset.tpl}`, {template: t.value}); toast(`🧾 Шаблон товара: ${tplLabel(t.value || effTpl({line: S.products.find(x => x.id === t.dataset.tpl).line}))}`); }catch(er){ alert(er.message || er); }
+      return refresh();
+    }
+    if(t.dataset.linetpl){
+      t.blur();
+      const l = S.lines.find(x => x.id === t.dataset.linetpl);
+      try{ await post(`/api/line/${t.dataset.linetpl}/template`, {template: t.value}); toast(`🧾 «${l ? l.name : ""}» — шаблон «${tplLabel(t.value)}»`); }catch(er){ alert(er.message || er); }
+      return refresh();
+    }
+    const i = e.target.closest("[data-edit]"); if(!i) return;
+    await post(`/api/product/${i.dataset.pid}`, {[i.dataset.edit]: i.value});
+  });
+  $(id).addEventListener("click", async e => {
+    const mt = e.target.closest("[data-mgrtpl]"); if(mt){ openManagerTpl(mt.dataset.mgrtpl); return; }
+    const b = e.target.closest("[data-act]"); if(!b) return;
+    const {act, pid, site, path} = b.dataset;
+    if(act === "texts") { textsModal(pid); return; }
+    if(act === "card") { cardModal(pid); return; }
+    if(act === "photos") { quickPhotos(pid); return; }
+    if(act === "brand"){ const p = S.products.find(x => x.id === pid); const off = !p.no_brand;
+      await post(`/api/product/${pid}`, {no_brand: off}); p.no_brand = off; toast(off ? "🚫 Товар выгружается без бренда" : "🏷 Товар выгружается с брендом"); }
+    if(act === "retry") await post(`/api/product/${pid}/retry`, {});
+    if(act === "folder") await post("/api/open_folder", {path});
+    if(act === "remove" && confirm("Убрать товар из очереди?\n\nПапка с фото перенесётся в «_удалено» — оттуда её можно вернуть.")) await api(`/api/product/${pid}`, {method:"DELETE"});
+    if(act === "chip"){
+      const p = S.products.find(x => x.id === pid), st = p.sites[site];
+      if(st.status === "done" && st.url) openExt(st.url);
+      if(st.status === "error") chipErrorModal(p, site, st);
+    }
+    refresh();
+  });
+}
+// Donini Manager: открываем сразу с шаблоном нужного вида товара (например «Галстуки» → шаблон галстуков)
+let mgrWantTpl = null;
+function openManager(lineId){  // по виду товара — его шаблон
+  const l = lineId && S ? S.lines.find(x => x.id === lineId) : null;
+  openManagerTpl(l ? l.template : null, true);
+}
+function openManagerTpl(tpl, noGo){
+  if(tpl) mgrWantTpl = tpl;
+  if(!noGo && page !== "manager"){ go("manager"); return; }
+  const sel = $("#mgrLine");
+  let cur = mgrWantTpl || sel.value;
+  if(!cur){ try{ cur = localStorage.getItem("plt_productType"); }catch(e){} }
+  const used = (id) => (S ? S.lines.filter(l => l.id !== "site" && l.template === id).map(l => l.name) : []);
+  const types = (META.types || []).slice().sort((a, b) => used(b.id).length - used(a.id).length);
+  if(!types.some(t => t.id === cur)) cur = (types[0] || {}).id;
+  sel.innerHTML = types.map(t => `<option value="${esc(t.id)}" ${t.id === cur ? "selected" : ""}>${esc(t.label)}${used(t.id).length ? " (" + esc(used(t.id).join(", ")) + ")" : ""}</option>`).join("");
+  let changed = false;
+  try{ if(cur && localStorage.getItem("plt_productType") !== cur){ localStorage.setItem("plt_productType", cur); changed = true; } }catch(e){}
+  const f = $("#mgrFrame");
+  if(!f.src) f.src = "/manager"; else if(changed) f.contentWindow.location.reload();
+  mgrWantTpl = null;
+}
+$("#mgrLine").onchange = (e) => openManagerTpl(e.target.value, true);
+// «🧾 Шаблоны»: шаблон выбранного вида товара, иначе — тот, по которому больше всего товаров в очереди
+$("#syncManager").onclick = () => {
+  const lf = $("#qLineFilter").value;
+  let tpl = lf ? (S.lines.find(l => l.id === lf) || {}).template : null;
+  if(!tpl){ const cnt = {}; S.products.filter(p => p.status !== "archived" && p.line !== "site").forEach(p => { const t = effTpl(p); cnt[t] = (cnt[t] || 0) + 1; });
+    tpl = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0] || null; }
+  openManagerTpl(tpl);
+};
+function chipErrorModal(p, site, st){
+  const s = S.sites.find(x => x.id === site);
+  modal(`<h3>Ошибка: ${esc(s?.name || site)}, товар ${esc(p.code)}</h3>
+    <div class="warn" style="font-size:13px">${esc(st.error)}</div>
+    ${st.shot ? `<img src="/api/shot?path=${encodeURIComponent(st.shot)}" style="max-width:100%;border-radius:8px;border:1px solid var(--border)">` : ""}
+    <div class="small muted">Если сайт изменил форму — перезапишите сценарий («Сайты и сценарии»). Если выставили вручную — «Выставлено вручную».</div>
+    <div class="row">
+      <button class="primary" data-m="retry">Повторить</button>
+      <button data-m="done">Выставлено вручную</button>
+      <button data-m="skip">Пропустить этот сайт</button>
+      <button data-m="close">Закрыть</button>
+    </div>`, async (m, close) => {
+      if(m === "retry") await post(`/api/product/${p.id}/retry`, {site});
+      if(m === "done") await post(`/api/product/${p.id}/mark_done`, {site});
+      if(m === "skip") await post(`/api/product/${p.id}/skip`, {site});
+      close(); refresh();
+  });
+}
+
+// ---------- сайты ----------
+const CURRENCIES = ["", "EUR", "PLN", "RON", "HUF", "CZK"];
+function renderSites(){
+  // запись сценария (в моём браузере)
+  const rl = $("#recLine"), rs = $("#recSite"), curL = rl.value, curS = rs.value;
+  if(document.activeElement !== rl){ setHTML(rl, S.lines.filter(l => l.id !== "site").map(l => `<option value="${esc(l.id)}">${esc(l.name)}</option>`).join("")); if(curL) rl.value = curL; }
+  const line = S.lines.find(l => l.id === rl.value);
+  const extSites = S.sites.filter(s => s.type === "ext" || s.type === "manual");
+  const inLine = extSites.filter(s => line && line.sites.includes(s.id)), other = extSites.filter(s => !(line && line.sites.includes(s.id)));
+  if(document.activeElement !== rs) setHTML(rs, [...inLine, ...other].map(s => { const n = s.scenarios[rl.value] || s.scenarios.default || 0;
+    return `<option value="${esc(s.id)}">${esc(s.name)}${line && !line.sites.includes(s.id) ? " (не в этом виде товара)" : ""}${n ? ` — ${n} шагов` : " — не записан"}</option>`; }).join(""));
+  if(curS && document.activeElement !== rs) rs.value = curS;
+  if(editing("sitesGrid")) return;
+  const onlyOn = $("#sitesOnlyOn").checked;
+  const langOpts = (cur) => META.langs.map(l => `<option value="${l.code}" ${l.code===cur?"selected":""}>${l.code} — ${l.name}</option>`).join("");
+  const curOpts = (cur) => CURRENCIES.map(c => `<option value="${c}" ${c === (cur||"") ? "selected" : ""}>${c || "по стране"}</option>`).join("");
+  setHTML($("#sitesGrid"), S.sites.filter(s => !onlyOn || s.enabled).map(s => {
+    const common = `<div class="row">
+        <label class="field">Пауза, мин<input class="tiny" type="number" step="0.5" data-f="min_interval_min" value="${s.min_interval_min ?? ""}"></label>
+        <label class="field">Лимит/день<input class="tiny" type="number" data-f="daily_limit" value="${s.daily_limit ?? ""}"></label>
+        <label class="field">Фото, макс<input class="tiny" type="number" data-f="max_photos" value="${s.max_photos ?? ""}"></label>
+        <label class="field">Язык<select data-f="lang">${langOpts(s.lang)}</select></label>
+        <label class="field">Валюта<select data-f="currency">${curOpts(s.currency)}</select></label>
+      </div>
+      <div class="row">
+        <label class="switch small"><input type="checkbox" data-f="title_brand" ${s.title_brand ? "checked" : ""}> бренд из очереди в название</label>
+        <label class="field" title="Например 2 — после названия будет 2 пробела">Пробелы после назв.<input class="tiny" type="number" min="0" max="10" data-f="title_spaces" value="${s.title_spaces||0}"></label>
+      </div>`;
+    if(s.type === "plugin"){
+      return `<div class="card" data-site="${s.id}">
+        <h3><span>${esc(s.name)} <span class="small muted">${s.lang} · напрямую, без браузера</span></span>
+          <label class="switch"><input type="checkbox" data-f="enabled" ${s.enabled?"checked":""}> вкл</label></h3>
+        <div class="small muted">Статус: <b>${esc(s.status)}</b> · сегодня: ${s.today}. Управление — страница «Мой сайт».</div>
+        <div class="row"><button class="sm" data-goto="site">Открыть «Мой сайт» →</button></div></div>`;
+    }
+    if(s.type === "manual" || s.type === "ext"){
+      const keys = Object.keys(s.scenarios).filter(k => s.scenarios[k]);
+      return `<div class="card" data-site="${s.id}">
+        <h3><span>${esc(s.name)} <span class="small muted">${s.lang} · в моём браузере</span></span>
+          <label class="switch"><input type="checkbox" data-f="enabled" ${s.enabled?"checked":""}> вкл</label></h3>
+        <div class="small muted">Сегодня выставлено: ${s.today}${s.daily_limit ? ` / ${s.daily_limit}` : ""}.</div>
+        ${keys.length ? keys.map(k => `<div class="sc"><span>${k === "default" ? "Сценарий (общий)" : k === "__edit" ? "✏️ Исправление названия" : `Для «${esc(S.lines.find(l=>l.id===k)?.name || k)}»`}<br>${s.has_publish[k] ? `<span class="ok">${s.scenarios[k]} шагов</span>` : `<span class="warn">${s.scenarios[k]} шагов, нет «Опубликовать»</span>`}</span>
+          <span class="row"><button class="sm" data-act="steps" data-site="${s.id}" data-line="${k}">Шаги</button><button class="sm primary" data-act="extrec" data-site="${s.id}" data-line="${k}">● Перезаписать</button></span></div>`).join("")
+          : `<div class="sc"><span class="warn">Сценарий не записан</span><button class="sm primary" data-act="extrec" data-site="${s.id}" data-line="default">● Записать</button></div>`}
+        ${common}
+        <div class="row"><button class="sm danger" data-act="delsite" data-site="${s.id}">Удалить сайт</button></div>
+      </div>`;
+    }
+    const scKeys = ["default", ...S.lines.map(l => l.id)];
+    const scRows = scKeys.filter(k => k === "default" || s.scenarios[k]).map(k => {
+      const n = s.scenarios[k] || 0;
+      const label = k === "default" ? "Сценарий (общий)" : `Для «${esc(S.lines.find(l=>l.id===k)?.name || k)}»`;
+      const st = !n ? `<span class="warn">не записан</span>` : (s.has_publish[k] ? `<span class="ok">${n} шагов</span>` : `<span class="warn">${n} шагов, нет «Опубликовать»</span>`);
+      return `<div class="sc"><span>${label}<br>${st}</span><span class="row">
+        <button class="sm primary" data-act="record" data-site="${s.id}" data-line="${k}">● Записать</button>
+        ${n ? `<button class="sm" data-act="test" data-site="${s.id}" data-line="${k}">Тест</button><button class="sm" data-act="steps" data-site="${s.id}" data-line="${k}">Шаги</button>` : ""}
+      </span></div>`;
+    }).join("");
+    return `<div class="card" data-site="${s.id}">
+      <h3><span>${esc(s.name)} <span class="small muted">${s.lang} · в фоне</span></span>
+        <label class="switch"><input type="checkbox" data-f="enabled" ${s.enabled?"checked":""}> вкл</label></h3>
+      <div class="small muted">Статус: <b>${esc(s.status)}</b> · сегодня: ${s.today} / ${s.daily_limit}</div>
+      ${scRows}
+      ${common}
+      <label class="switch small"><input type="checkbox" data-f="confirm_before_publish" ${s.confirm_before_publish?"checked":""}> перед публикацией ждать моего нажатия</label>
+      <div class="row">
+        <button class="sm" data-act="open" data-site="${s.id}">🔑 Войти / открыть сайт</button>
+        <button class="sm danger" data-act="delsite" data-site="${s.id}">Удалить сайт</button>
+      </div>
+    </div>`;
+  }).join(""));
+}
+$("#sitesOnlyOn").onchange = () => render(true);
+$("#recLine").onchange = () => render(true);
+$("#recGo").onclick = () => extRecord($("#recSite").value, $("#recLine").value);
+async function extRecord(site, line){
+  if(!EXT.ok){ alert("Расширение Donini не отвечает — запись невозможна."); return; }
+  const r = await ext({type:"record", site, line: line || "default"}, 30000);
+  if(!r || r.ok === false) alert((r && r.error) || "Не получилось начать запись");
+}
+$("#sitesGrid").addEventListener("change", async e => {
+  const card = e.target.closest(".card");
+  const f = e.target.dataset.f; if(!f || !card) return;
+  let v = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+  if(e.target.type === "number") v = Number(String(v).replace(",", "."));
+  await post(`/api/site/${card.dataset.site}`, {[f]: v});
+  refresh();
+});
+$("#sitesGrid").addEventListener("click", async e => {
+  const b = e.target.closest("[data-act]"); if(!b) return;
+  const {act, site, line} = b.dataset;
+  if(act === "extrec") { await extRecord(site, line || "default"); return; }
+  if(act === "record"){ await post(`/api/site/${site}/record`, {line}); alert("Открываю сайт для записи (до минуты). Если окно не появилось — смотрите «Журнал»."); }
+  if(act === "test") await post(`/api/site/${site}/test`, {line});
+  if(act === "open") await post(`/api/site/${site}/open`);
+  if(act === "steps") { stepsModal(site, line); return; }
+  if(act === "delsite" && confirm("Удалить сайт и его сценарии?")) await api(`/api/site/${site}`, {method:"DELETE"});
+  refresh();
+});
+$("#addSiteBtn").onclick = () => {
+  modal(`<h3>Новый сайт</h3>
+    <label class="field">Название<input id="ns_name" placeholder="Например: Bazos.cz"></label>
+    <label class="field">Адрес сайта<input id="ns_url" placeholder="https://www.bazos.cz/"></label>
+    <label class="field">Как выставлять<select id="ns_type"><option value="ext">В моём браузере — расширение (рекомендуется)</option><option value="scenario">В фоне — программа сама</option></select></label>
+    <label class="field">Язык текстов<select id="ns_lang">${META.langs.map(l=>`<option value="${l.code}">${l.code} — ${l.name}</option>`).join("")}</select></label>
+    <div class="row"><button class="primary" data-m="ok">Добавить</button><button data-m="close">Отмена</button></div>`,
+    async (m, close) => {
+      if(m === "ok") await post("/api/site_new", {name: $("#ns_name").value, start_url: $("#ns_url").value, lang: $("#ns_lang").value, type: $("#ns_type").value});
+      close(); refresh();
+    });
+};
+async function stepsModal(siteId, line){
+  const site = await api(`/api/site/${siteId}`);
+  const steps = site.scenarios[line] || [];
+  const ACT = {goto:"открыть", click:"клик", publish:"ОПУБЛИКОВАТЬ", fill:"вписать", select:"выбрать", selectText:"выбрать", pick:"выбрать в списке", choose:"выбрать", check:"галочка", upload:"фото", wait:"пауза"};
+  const draw = () => `<h3>Шаги: ${esc(site.name)}</h3>
+    <div class="small muted">Можно удалить лишний шаг или поменять текст. {title} — название, {body} — описание, {price} — цена, {size} — размер, {code} — код.</div>
+    <ol class="steps">${steps.map((s, i) => `<li>
+      <b style="min-width:110px">${ACT[s.action] || s.action}</b>
+      ${s.action === "fill" ? `<input data-i="${i}" value="${esc(s.value)}" style="flex:1">` :
+        `<span style="flex:1">${esc(s.label || s.url || s.value || "")}<br><code>${esc((s.selectors||[])[0]||"")}</code></span>`}
+      <button class="sm danger" data-del="${i}">✕</button></li>`).join("")}</ol>
+    <div class="row"><button class="primary" data-m="save">Сохранить</button><button data-m="close">Закрыть</button></div>`;
+  const m = modal(draw(), async (act, close) => {
+    if(act === "save"){
+      m.querySelectorAll("input[data-i]").forEach(inp => steps[+inp.dataset.i].value = inp.value);
+      site.scenarios[line] = steps;
+      await post(`/api/site/${siteId}`, {scenarios: site.scenarios});
+      close(); refresh();
+    } else close();
+  });
+  m.addEventListener("click", e => {
+    const d = e.target.closest("[data-del]"); if(!d) return;
+    m.querySelectorAll("input[data-i]").forEach(inp => steps[+inp.dataset.i].value = inp.value);
+    steps.splice(+d.dataset.del, 1);
+    m.querySelector(".modal").innerHTML = draw();
+  });
+}
+
+// ---------- виды товара (линии) ----------
+function renderLines(){
+  if(!linesDraft) linesDraft = JSON.parse(JSON.stringify(S.lines));
+  const typeOpts = (cur) => META.types.map(t => `<option value="${t.id}" ${t.id===cur?"selected":""}>${esc(t.label)}${t.custom?" (свой)":""}</option>`).join("");
+  $("#linesBox").innerHTML = linesDraft.map((l, i) => `<div class="card" data-i="${i}">
+    <h3><input data-l="name" value="${esc(l.name)}" style="font-weight:600;flex:1"><button class="sm danger" data-del="${i}">Удалить</button></h3>
+    <label class="field">Папка в очереди<input data-l="folder" value="${esc(l.folder)}"></label>
+    <label class="field">Шаблон текста<select data-l="template">${typeOpts(l.template)}</select></label>
+    <div class="row">
+      <label class="field" style="flex:1">Размер по умолчанию<input data-l="default_size" value="${esc(l.default_size)}"></label>
+      <label class="field">Цена по умолч., зл<input class="tiny" data-l="default_price" value="${esc(l.default_price || "")}"></label>
+    </div>
+    <div class="field">Выставлять на сайты
+      <div class="chips">${S.sites.map(s => `<label class="switch chip" style="cursor:pointer"><input type="checkbox" data-site="${s.id}" ${l.sites.includes(s.id)?"checked":""}> ${esc(s.name)}</label>`).join("")}</div>
+    </div>
+    <details><summary class="small muted" style="cursor:pointer">Посмотреть текст для страны</summary>
+      <div class="row" style="margin:6px 0"><select data-prev="${i}">${META.langs.map(x=>`<option>${x.code}</option>`).join("")}</select></div>
+      <div class="tpl" id="prev_${i}">выберите страну</div>
+    </details>
+  </div>`).join("");
+}
+$("#linesBox").addEventListener("input", e => {
+  const card = e.target.closest(".card"); if(!card) return;
+  const l = linesDraft[+card.dataset.i];
+  if(e.target.dataset.l){ l[e.target.dataset.l] = e.target.dataset.l === "default_price" ? Number(e.target.value.replace(",", ".")) || 0 : e.target.value; }
+  if(e.target.dataset.site){
+    const id = e.target.dataset.site;
+    l.sites = e.target.checked ? [...new Set([...l.sites, id])] : l.sites.filter(x => x !== id);
+  }
+});
+let linesSaveT = null;
+async function autoSaveLines(){
+  clearTimeout(linesSaveT);
+  linesSaveT = setTimeout(async () => {
+    try { await post("/api/config", {lines: linesDraft}); const st = $("#linesSaved"); st.textContent = "✓ Сохранено " + new Date().toLocaleTimeString().slice(0,5); st.style.color = "var(--ok)"; }
+    catch(err){ const st = $("#linesSaved"); st.textContent = "⚠️ Не сохранилось — нажмите «Сохранить»"; st.style.color = "var(--err)"; }
+  }, 400);
+}
+// вид товара назвали «Галстуки» (или «Кошельки», «Ремни»…) — сразу ставим его шаблон текста
+function guessTemplate(name){
+  const n = (name || "").trim().toLowerCase(); if(n.length < 3) return null;
+  const t = META.types.find(t => { const lb = t.label.toLowerCase(); return lb === n || lb.startsWith(n.slice(0, 5)) || n.startsWith(lb.slice(0, 5)); });
+  return t ? t.id : null;
+}
+$("#linesBox").addEventListener("change", e => {
+  if(e.target.dataset.l !== "name") return;
+  const card = e.target.closest(".card"), l = linesDraft[+card.dataset.i];
+  const g = guessTemplate(e.target.value);
+  if(g && g !== l.template){ l.template = g; const sel = card.querySelector('[data-l="template"]'); if(sel) sel.value = g; autoSaveLines(); toast(`Шаблон текста: ${META.types.find(t => t.id === g).label}`); }
+});
+$("#linesBox").addEventListener("change", async e => {
+  if(e.target.dataset.l === "template" || e.target.dataset.l === "name") { const l = linesDraft[+e.target.closest(".card").dataset.i]; l[e.target.dataset.l] = e.target.value; }
+  if(e.target.dataset.l || e.target.dataset.site) autoSaveLines();
+  const pv = e.target.dataset.prev; if(pv === undefined) return;
+  const l = linesDraft[+pv];
+  const r = await api(`/api/preview?line=${encodeURIComponent(l.id)}&lang=${e.target.value}&size=${encodeURIComponent(l.default_size)}&code=83278&price=${l.default_price||0}`);
+  $("#prev_" + pv).textContent = `${r.title}\n\n${r.body}\n\nЦена: ${r.price} ${r.currency}`;
+});
+$("#linesBox").addEventListener("click", e => {
+  const d = e.target.closest("[data-del]"); if(!d) return;
+  if(confirm("Удалить вид товара? (папка с фото не удаляется)")){ linesDraft.splice(+d.dataset.del, 1); renderLines(); autoSaveLines(); }
+});
+$("#addLineBtn").onclick = () => {
+  const id = "line" + Date.now().toString(36);
+  linesDraft.push({id, name:"Новый вид", folder:"Новый вид", template:"bags", default_size:"", default_price:0, sites:[], counter:0});
+  renderLines(); autoSaveLines();
+};
+$("#saveLinesBtn").onclick = async () => { await post("/api/config", {lines: linesDraft}); linesDraft = null; await refresh(); renderLines(); alert("Сохранено"); };
+
+// ---------- настройки ----------
+async function loadSettings(){
+  const c = await api("/api/config");
+  $("#s_counter").value = c.code_counter; $("#s_counter").dataset.was = c.code_counter; $("#s_shared").checked = c.shared_counter;
+  $("#s_h1").value = c.work_hours[0]; $("#s_h2").value = c.work_hours[1];
+  $("#s_del").value = c.delete_done_after_days; $("#s_px").value = c.photo_max_side;
+  $("#s_ai").value = ""; $("#s_aion").checked = c.ai_brand !== false;
+  $("#s_aiinfo").innerHTML = c.ai_key_set ? `<span class="ok">✓ ключ сохранён</span>` : `<span class="muted">ключа нет</span>`;
+  for(const k of ["EUR","HUF","RON","CZK"]) $("#r_" + k).value = c.rates[k];
+  $("#tg_token").value = c.telegram.token || ""; $("#tg_chat").value = c.telegram.chat_id || "";
+  $("#s_queue").value = c.queue_root; $("#s_done").value = c.done_root; $("#s_channel").value = c.browser_channel || ""; $("#s_proxy").value = c.proxy || "";
+  try {
+    const b = await api("/api/app/browser");
+    $("#ubSel").innerHTML = `<option value="auto">Автоматически${b.auto ? ` (сейчас: ${esc(b.names[b.auto] || b.auto)})` : ""}</option>` +
+      b.installed.map(k => `<option value="${k}">${esc(b.names[k])}</option>`).join("");
+    $("#ubSel").value = b.choice || "auto";
+    $("#ubInfo").innerHTML = `Сейчас программа открывает: <b>${esc(b.names[b.current] || "—")}</b>` +
+      (b.default ? ` · по умолчанию в Windows: ${esc(b.names[b.default] || b.default)}` : "") +
+      (b.ext_seen && b.ext_seen.length ? ` · расширение работает в: ${b.ext_seen.map(k => esc(b.names[k] || k)).join(", ")}` : "");
+  } catch(e){}
+  try { const a = await api("/api/app/autostart"); $("#autostart").checked = a.on; $("#autostart").disabled = !a.available; } catch(e){}
+  $("#extInfo").innerHTML = EXT.ok ? `<span class="ok">✓ Расширение в браузере на связи, версия ${esc(EXT.version)}</span>` : `<span class="warn">Расширение в браузере не отвечает</span>`;
+}
+$("#s_aiclear").onclick = async () => { if(!confirm("Удалить ключ Claude API из программы?")) return; await post("/api/config", {ai_key_clear: true}); loadSettings(); };
+$("#ubSel").onchange = async (e) => { await post("/api/app/browser", {choice: e.target.value}); loadSettings(); };
+$("#autostart").onchange = async (e) => { const r = await post("/api/app/autostart", {on: e.target.checked}); if(r.ok === false){ alert(r.error); e.target.checked = !e.target.checked; } };
+$("#saveSettings").onclick = async () => {
+  const num = (id) => Number(String($(id).value).replace(",", "."));
+  await post("/api/config", {
+    code_counter: num("#s_counter"), code_counter_was: Number($("#s_counter").dataset.was), shared_counter: $("#s_shared").checked,
+    work_hours: [num("#s_h1"), num("#s_h2")], delete_done_after_days: num("#s_del"), photo_max_side: num("#s_px"),
+    rates: {EUR: num("#r_EUR"), HUF: num("#r_HUF"), RON: num("#r_RON"), CZK: num("#r_CZK")},
+    telegram: {token: $("#tg_token").value.trim(), chat_id: $("#tg_chat").value.trim()},
+    queue_root: $("#s_queue").value.trim(), done_root: $("#s_done").value.trim(), browser_channel: $("#s_channel").value, proxy: $("#s_proxy").value.trim(),
+    ai_key: $("#s_ai").value.trim(), ai_brand: $("#s_aion").checked,
+  });
+  alert("Сохранено");
+};
+const EXT_PAGE = {yandex:"browser://extensions", chrome:"chrome://extensions", edge:"edge://extensions", brave:"brave://extensions", opera:"opera://extensions", vivaldi:"vivaldi://extensions"};
+async function extHelpModal(reason){
+  let b = {}, paths = {};
+  try{ b = await api("/api/app/browser"); }catch(e){}
+  try{ paths = await api("/api/app/paths"); }catch(e){}
+  let dg = {copies: []}; try{ dg = await api("/api/ext/diag"); }catch(e){}
+  const key = b.current || "chrome", nm = (b.names || {})[key] || "браузер";
+  const old = dg.copies.filter(c => !c.bridge);
+  const diag = dg.copies.length ? `<div class="sc" style="display:block;line-height:1.6"><b>Что видит программа:</b><br>${dg.copies.map(c =>
+      `• ${esc(c.browser)}: расширение ${c.bridge ? `<span class="ok">на связи, v${esc(c.version || "?")}</span>` :
+        `<span class="warn">старая копия — с окном программы не работает</span>`} <span class="muted">(id ${esc(c.id.slice(0, 8))}…, ${c.ago} сек назад)</span>`).join("<br>")}
+      ${old.length ? `<br><b style="color:var(--err)">Решение:</b> на странице расширений этого браузера нажмите «Удалить» у Donini Poster, затем «Загрузить распакованное расширение» → папка ниже. Старая копия загружена из другой папки, поэтому она не обновляется.` : ""}</div>`
+    : `<div class="sc" style="display:block">Программа не получила ни одного сигнала от расширения — значит, в браузере оно не установлено или выключено.</div>`;
+  modal(`<h3>🧩 Расширение Donini не отвечает</h3>
+    <div class="small muted">${esc(reason || "")}</div>
+    ${diag}
+    <div class="sc" style="display:block;line-height:1.7">
+      <b>Сделайте один раз в ${esc(nm)}:</b>
+      <ol class="hl">
+        <li>Откройте в адресной строке <code class="cp">${EXT_PAGE[key] || "chrome://extensions"}</code> (нажмите — скопируется).</li>
+        <li>Включите <b>«Режим разработчика»</b>.</li>
+        <li>Если «Donini Poster» уже есть в списке — нажмите у него ⟳ (обновить). Если его нет — <b>«Загрузить распакованное расширение»</b> и выберите папку:<br><code class="cp">${esc(paths.extension || "DoniniPoster\\extension")}</code></li>
+        <li>Через 5–10 секунд вверху программы загорится зелёным «расширение v…».</li>
+      </ol>
+    </div>
+    <div class="small muted">Браузеры на компьютере: ${(b.installed || []).map(k => esc((b.names||{})[k])).join(", ") || "—"}.
+      ${b.ext_seen && b.ext_seen.length ? `Расширение недавно отвечало из: ${b.ext_seen.map(k => esc((b.names||{})[k] || k)).join(", ")}.` : "Расширение пока ни разу не ответило этой версии программы."}
+      Другой браузер — «Настройки → 🌐 Браузер с расширением».</div>
+    <div class="row"><button data-m="folder">📂 Открыть папку extension</button><button data-m="restart">🔄 Перезапустить ${esc(nm)}</button><button class="primary" data-m="close">Понятно</button></div>`,
+    async (m, close) => {
+      if(m === "folder") post("/api/open_folder", {path: "__EXT__"});
+      if(m === "restart"){ close(); restartBrowser(true); }
+      if(m === "close") close();
+    });
+}
+async function restartBrowser(skipConfirm){
+  if(skipConfirm !== true && !confirm("Перезапустить браузер? Он закроется и откроется снова с расширением — открытые вкладки вернутся. Если идёт выставление на досках — сначала остановите авто-режим.")) return;
+  await post("/api/browser/restart");
+  const btns = $$("#bnRestart,#restartBrowser"); btns.forEach(x => { x.disabled = true; x.textContent = "Перезапускаю… (до 30 сек)"; });
+  let ok = false;
+  for(let i = 0; i < 15 && !ok; i++){ await new Promise(r => setTimeout(r, 2500)); await loadExt(); ok = EXT.ok; }
+  btns.forEach(x => { x.disabled = false; x.textContent = "🔄 Перезапустить браузер"; });
+  render(true);
+  if(!ok) extHelpModal("Браузер перезапущен, но расширение так и не ответило — скорее всего, оно не установлено в этот браузер или нужна его перезагрузка.");
+}
+$("#restartBrowser").onclick = restartBrowser;
+$("#exportBtn2").onclick = () => $("#exportBtn").click();
+$("#restoreBtn").onclick = () => { $("#restoreFile").value = ""; $("#restoreFile").click(); };
+$("#restoreFile").onchange = async (e) => {
+  const f = e.target.files[0]; if(!f) return;
+  if(!confirm(`Восстановить всё из «${f.name}»?\n\nТекущие настройки и очередь заменятся содержимым копии. Программа перезапустится сама.`)) return;
+  const r = await fetch("/api/app/restore", {method:"POST", body: f});
+  const d = await r.json().catch(() => ({}));
+  if(!r.ok){ alert(d.detail || "Не получилось"); return; }
+  document.body.innerHTML = "<div class='empty' style='margin:auto'>♻️ Восстановлено файлов: " + d.files + ". Программа перезапускается — окно откроется само через 10–15 секунд.</div>";
+};
+$("#backupBtn").onclick = async () => {
+  const b = $("#backupBtn"); b.disabled = true; b.textContent = "Собираю архив…";
+  try { const r = await post("/api/app/export", {full: true});
+    alert(`Готово! На рабочем столе: «${r.path.split(/[\\/]/).pop()}».\n\nСкопируйте его на флешку или Google Диск. Внутри ваши настройки и ключи — никому не передавайте.`);
+  } finally { b.disabled = false; b.textContent = "💾 Сделать резервную копию"; }
+};
+$("#openExtFolder2").onclick = () => post("/api/open_folder", {path: "__EXT__"});
+$("#copyExtPath").onclick = async () => { try{ await navigator.clipboard.writeText($("#extPath").textContent); $("#copyExtPath").textContent = "✓ Скопировано"; }catch(e){ prompt("Скопируйте путь:", $("#extPath").textContent); } };
+api("/api/app/paths").then(p => { $("#extPath").textContent = p.extension; }).catch(() => {});
+$("#exportBtn").onclick = async () => {
+  $("#exportBtn").disabled = true; $("#exportBtn").textContent = "Собираю архив…";
+  try { const r = await post("/api/app/export");
+    alert(`Готово! На рабочем столе: «DoniniPoster для передачи.zip».\n\nВнутри — программа и все записанные сценарии сайтов. Ваших ключей, Telegram, очереди и журнала там нет.\n\nЧеловеку: распаковать архив → запустить «Запуск.bat» → поставить расширение из папки extension в свой браузер (Яндекс, Chrome, Edge…).`);
+  } finally { $("#exportBtn").disabled = false; $("#exportBtn").textContent = "📦 Сделать копию для другого человека"; }
+};
+$("#openProgBrowser").onclick = async () => { await post("/api/browser/open"); alert("Окно браузера программы открыто. Поставьте VPN-расширение и включите его."); refresh(); };
+$("#openExtFolder").onclick = () => post("/api/open_folder", {path: "__EXT__"});
+$("#tgFind").onclick = async () => { const r = await post("/api/telegram/find", {token: $("#tg_token").value.trim()}); $("#tg_chat").value = r.chat_id; alert("Нашёл и сохранил! Теперь нажмите «Проверить»."); };
+$("#tgTest").onclick = async () => { await post("/api/telegram/test", {token: $("#tg_token").value.trim(), chat_id: $("#tg_chat").value.trim()}); alert("✅ Отправил — проверьте Telegram."); };
+$("#tplImport").onclick = async () => { const r = await post("/api/templates/import", {code: $("#tplCode").value}); META = await api("/api/meta"); alert(`Импортировано шаблонов: ${r.count}`); };
+$("#quitBtn").onclick = async () => { if(confirm("Выключить программу? Выставление остановится.")){ await post("/api/quit"); document.body.innerHTML = "<div class='empty' style='margin:auto'>Программа выключена. Запустите ярлык «Donini Poster», чтобы включить снова.</div>"; } };
+
+// ---------- мой сайт (WooCommerce) ----------
+let WOO = null, wooDirty = false, wooFilled = false;
+document.addEventListener("input", (e) => { if (e.target.closest && e.target.closest("#wooCard")) wooDirty = true; });
+function wooFill(lists){
+  const w = (WOO && WOO.woo) || {};
+  const opt = (arr, cur, empty) => `<option value="">${empty}</option>` + arr.map(x => `<option value="${x.id}" ${String(x.id)===String(cur||"")?"selected":""}>${esc(x.name)}${x.count!=null?` (${x.count})`:""}</option>`).join("");
+  $("#w_cat").innerHTML = opt(lists.categories, w.category, "— без категории —");
+  const guess = (re, cur) => cur || ((lists.attributes.find(a => re.test(a.name)) || {}).id || "");
+  $("#w_brand").innerHTML = opt(lists.attributes, guess(/marka|brand|бренд/i, w.brand_attr), "— не ставить —");
+  $("#w_size").innerHTML = opt(lists.attributes, guess(/rozmiar|wymiar|size|размер/i, w.size_attr), "— не ставить —");
+  $("#wLists").style.display = "";
+}
+function wooForm(){
+  return {url: $("#w_url").value.trim(), ck: $("#w_ck").value.trim(), cs: $("#w_cs").value.trim(),
+          wp_user: $("#w_user").value.trim(), wp_pass: $("#w_pass").value.trim(), status: $("#w_status").value,
+          pause_sec: $("#w_pause").value.trim(), template: $("#w_tpl").value.trim(),
+          ...( $("#wLists").style.display === "" ? {category: $("#w_cat").value, brand_attr: $("#w_brand").value, size_attr: $("#w_size").value} : {})};
+}
+async function wooLoad(){
+  try { WOO = await api("/api/woo/config"); } catch(e){ return; }
+  const w = WOO.woo || {};
+  if (!wooFilled || !wooDirty) {
+    wooFilled = true;
+    $("#w_url").value = w.url || ""; $("#w_ck").value = w.ck || ""; $("#w_cs").value = w.cs || "";
+    $("#w_user").value = w.wp_user || ""; $("#w_pass").value = w.wp_pass || ""; $("#w_status").value = w.status || "publish";
+    $("#w_pause").value = w.pause_sec || "10"; $("#w_tpl").value = w.template || "";
+  }
+  const ready = w.url && w.ck;
+  $("#wRun").textContent = WOO.running ? "■ Остановить загрузку" : "▶ Начать загрузку";
+  $("#wRun").className = (WOO.running ? "stop" : "go") + " big";
+  $("#wRun").disabled = !ready;
+  $("#wooRunCard").className = "card " + (WOO.running ? "on" : "hot");
+  $("#wooPill").className = "pill" + (WOO.running ? " on" : "");
+  $("#wooPill").innerHTML = WOO.running ? `<span class="dot"></span>загружает` : ready ? "остановлено" : "не подключён";
+  $("#wInfo").innerHTML = ready ? `в очереди: <b>${WOO.left}</b> · загружено: <b>${WOO.done}</b>${WOO.errors ? ` · <span class="warn">ошибок: ${WOO.errors}</span>` : ""}${WOO.running && WOO.status ? ` — ${esc(WOO.status)}` : ""}` : "Сначала подключите сайт ниже (⚙️ Подключение).";
+  if(!ready) $("#wooCard").open = true;
+}
+async function wooToggle(){ await post("/api/woo/run", {on: !(WOO && WOO.running)}); await wooLoad(); render(true); }
+$("#wCheck").onclick = async () => { const r = await post("/api/woo/check", wooForm()); wooDirty = false; await wooLoad(); wooFill(r);
+  $("#wTplInfo").innerHTML = r.template ? `✅ Образец: <b>${esc(r.template.name)}</b> (артикул ${esc(r.template.sku||"—")}, цена ${esc(r.template.price||"—")})<br><span class="muted">${r.template.attrs.map(esc).join(" · ")}</span>` : "";
+  alert("✅ Сайт подключён и ключи сохранены. Выберите категорию и атрибуты и нажмите «Сохранить»."); };
+$("#wSave").onclick = async () => { await post("/api/woo/config", wooForm()); wooDirty = false; await wooLoad(); alert("Сохранено"); };
+$("#wRun").onclick = async () => { if(wooDirty) await post("/api/woo/config", wooForm()); wooDirty = false; await wooToggle(); };
+$("#wFolder").onclick = async () => { const l = S.lines.find(x => x.id === "site"); await post("/api/open_folder", {path: l ? l.folder : ""}); };
+
+// ---------- журнал ----------
+function renderLog(){
+  const box = $("#logBox");
+  const q = $("#logSearch").value.trim().toLowerCase(), eo = $("#logErrOnly").checked;
+  const lines = S.logs.filter(l => (!q || l.toLowerCase().includes(q)) && (!eo || /❌|⚠️|Ошибка|ошибк/.test(l)));
+  const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
+  if(!setHTML(box, lines.map(l => `<span class="logline ${logCls(l)}">${esc(l)}</span>`).join("\n"))) return;
+  if(atBottom) box.scrollTop = box.scrollHeight;
+}
+$("#logSearch").oninput = renderLog; $("#logErrOnly").onchange = renderLog;
+
+// ---------- текст товара ----------
+async function textsModal(pid){
+  const d = await api(`/api/product/${pid}/texts`);
+  if(!d.langs.length){ alert("У этого товара нет сайтов."); return; }
+  const html = `<h3>Текст товара ${esc(d.code)}</h3>
+    <div class="small muted">Это то, что вставится на сайты. Правка действует только для этого товара. «По шаблону» — вернуть исходный текст.</div>
+    <div style="max-height:65vh;overflow:auto;padding-right:4px">${d.langs.map(x => `<div class="card" data-lang="${x.lang}" style="margin-bottom:10px">
+      <div class="row" style="justify-content:space-between"><b>${esc(x.country)} <span class="small muted">· ${esc(x.sites.join(", "))}</span>${x.edited ? ` <span class="chip done">изменён</span>` : ""}</b>
+        <button class="sm" data-m="reset:${x.lang}">↺ По шаблону</button></div>
+      <label class="field">Название<input data-k="title" value="${esc(x.title)}" style="width:100%"></label>
+      <label class="field">Описание<textarea data-k="body" rows="7" style="width:100%">${esc(x.body)}</textarea></label>
+    </div>`).join("")}</div>
+    <div class="row"><button class="primary" data-m="save">Сохранить</button><button data-m="close">Закрыть</button></div>`;
+  const m = modal(html, async (act, close) => {
+    if(act.startsWith("reset:")){
+      const lang = act.slice(6), x = d.langs.find(y => y.lang === lang), card = m.querySelector(`[data-lang="${lang}"]`);
+      card.querySelector('[data-k="title"]').value = x.auto_title;
+      card.querySelector('[data-k="body"]').value = x.auto_body;
+      return;
+    }
+    if(act === "save"){
+      const body = {};
+      m.querySelectorAll("[data-lang]").forEach(c => body[c.dataset.lang] = {title: c.querySelector('[data-k="title"]').value, body: c.querySelector('[data-k="body"]').value});
+      await post(`/api/product/${pid}/texts`, body);
+      close(); refresh(); return;
+    }
+    close();
+  });
+}
+function modal(html, onAct){
+  const bg = document.createElement("div");
+  bg.className = "modal-bg";
+  bg.innerHTML = `<div class="modal">${html}</div>`;
+  const close = () => bg.remove();
+  bg.addEventListener("click", e => {
+    if(e.target === bg) return close();
+    const b = e.target.closest("[data-m]"); if(b) onAct(b.dataset.m, close);
+  });
+  $("#modalRoot").appendChild(bg);
+  return bg;
+}
+
+
+// ---------- исправление уже выставленных объявлений ----------
+let EDIT_INIT = false;
+function editsPage(){
+  if(EDIT_INIT) return editsRefresh && editsRefresh();
+  EDIT_INIT = true;
+  const y = new Date(Date.now() - 86400000); const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;  // по местному времени
+  const sites = S.sites.filter(s => (s.type === "ext" || s.type === "manual"));
+  let prev = null;
+  const m = $("#editsCard");
+  m.innerHTML = `<h3>✏️ Исправить выставленные объявления</h3>
+    <div class="small muted">Бот откроет каждое объявление на сайте и поменяет название. По разу на каждый сайт нужно записать, как исправлять (открыть объявление → «Szerkesztés» → поле названия → кнопка «Название» в панели → «Mentés»).</div>
+    <div class="row" style="flex-wrap:wrap">${sites.map(s => `<label class="switch"><input type="checkbox" data-es="${esc(s.id)}" ${/vatera/.test(s.id) ? "checked" : ""}> ${esc(s.name)}</label>`).join("")}</div>
+    <div class="small muted">Исправляются только отмеченные сайты.</div>
+    <div class="row">
+      <label class="field">Выставлены (дата)<input id="edDate" type="date" value="${ymd(y)}"></label>
+      <label class="field" style="flex:1">Было в названии<input id="edFind" value="Női és férfi bőr táska hátizsák"></label>
+    </div>
+    <label class="field">Новое название (вместо старого; код товара останется)<input id="edRepl" placeholder="например: Női bőr táska"></label>
+    <div class="row"><button data-m="prev">🔎 Посмотреть, что исправится</button><span class="spacer"></span><span id="edStatus" class="small muted"></span></div>
+    <div id="edPrev"></div>
+    <div class="row"><button data-m="test" title="Бот исправит только первое объявление и остановится перед сохранением — нажмёте сами. Очередь в это время работает как обычно">🧪 Проверить на одном</button><button class="primary" data-m="start">▶ Исправить все</button><button data-m="pause" id="edPauseBtn">⏸ Пауза</button><button class="danger" data-m="cancel" title="Снять все задания исправления">Отменить исправление</button></div>
+    <div class="small muted">Исправления идут через то же расширение, вперемешку с очередью: один товар из очереди, одно исправление — очередь не останавливается. Должен работать «▶ Авто».</div>`;
+  m.addEventListener("click", async e => { const b = e.target.closest("[data-m]"); if(b) onAct(b.dataset.m); });
+  m.addEventListener("change", e => { if(e.target.matches("[data-es]")) showPrev(); });
+  async function onAct(act){
+    const body = () => ({sites: [...m.querySelectorAll("[data-es]")].filter(c => c.checked).map(c => c.dataset.es), date: $("#edDate", m).value, find: $("#edFind", m).value, replace: $("#edRepl", m).value});
+    if(act === "prev") return showPrev();
+    if(act === "pause"){ const r = await api("/api/edit/status"); await post("/api/edit/pause", {paused: !r.paused}); return status(); }
+    if(act === "start"){
+      if(!$("#edRepl", m).value.trim()) return alert("Впишите новое название");
+      await showPrev(); const n = prev ? prev.sites.reduce((a, x) => a + x.count, 0) : 0;
+      if(!n) return alert("Не найдено объявлений для исправления");
+      if(!confirm(`Исправить название в ${n} объявлениях?\n\nДальше запустите «▶ Авто» (или «Пачкой» по сайту) — бот откроет каждое объявление и сохранит новое название.`)) return;
+      try{ const r = await post("/api/edit/start", body()); toast(`✏️ В работе: ${r.count}. Запустите «▶ Авто»`); }catch(e){}
+      return status();
+    }
+    if(act === "test"){
+      if(!$("#edRepl", m).value.trim()) return alert("Впишите новое название");
+      try{ const r = await post("/api/edit/start", {...body(), test: true}); toast(`🧪 Проверка: ${r.count} объявление(я). Бот откроет его в очереди «▶ Авто» и остановится перед сохранением`); }catch(e){}
+      alert("Бот откроет первое объявление (по одному на каждый выбранный сайт), впишет новое название и ОСТАНОВИТСЯ перед сохранением — даже в режиме «без меня».\n\nПроверьте: это редактирование нужного объявления, название новое → нажмите подсвеченную кнопку сами. Потом проверьте объявление на сайте.\n\nПока вы не нажмёте, следующий товар очереди ждёт.");
+      return status();
+    }
+    if(act === "cancel"){ if(!confirm("Снять все задания исправления? Объявления останутся как есть.")) return; await post("/api/edit/cancel"); toast("Исправление отменено"); return status(); }
+  }
+  async function status(){ try{ const r = await api("/api/edit/status");
+    $("#edStatus", m).innerHTML = r.left ? `<b>Осталось: ${r.left}</b>${r.errors ? `, <span class="warn">с ошибкой: ${r.errors}</span>` : ""} · исправлено: ${r.done}${r.paused ? ` · <span class="warn">на паузе</span>` : ""}` : (r.done ? `<span class="ok">Исправлено: ${r.done}</span>` : "");
+    if(r.manual && r.manual.length) $("#edStatus", m).innerHTML += `<br><span class="warn">Исправить вручную (нет номера объявления): ${esc(r.manual.join(", "))}</span>`;
+    $("#edPauseBtn", m).textContent = r.paused ? "▶ Продолжить" : "⏸ Пауза";
+    const bd = $("#bEdits"); bd.textContent = r.left || ""; bd.classList.toggle("hidden", !r.left);
+  }catch(e){} }
+  editsRefresh = status; setInterval(() => { if(page === "edits") status(); }, 5000);
+  async function showPrev(){
+    const b = {sites: [...m.querySelectorAll("[data-es]")].filter(c => c.checked).map(c => c.dataset.es), date: $("#edDate", m).value, find: $("#edFind", m).value, replace: $("#edRepl", m).value};
+    try{ prev = await post("/api/edit/preview", b); }catch(e){ return; }
+    $("#edPrev", m).innerHTML = prev.sites.length ? prev.sites.map(x => `<div class="card" style="padding:10px;margin:6px 0">
+      <b>${esc(x.name)}: ${x.count} объявлений</b>${x.no_id ? ` <span class="warn small">(у ${x.no_id} нет номера объявления — бот найдёт их по коду через поиск, если так записано)</span>` : ""}
+      <div class="row" style="margin-top:6px"><label class="field" style="flex:1">Страница объявления для исправления (можно {ad_id} — номер объявления, {code} — код товара)
+        <input data-eurl="${esc(x.site)}" value="${esc(x.edit_url || "")}" placeholder="${x.site === "vatera" ? "https://www.vatera.hu/item/mod/?id={ad_id}" : "страница «Мои объявления», где есть поиск"}"></label>
+        <button class="sm" data-esave="${esc(x.site)}">💾</button></div>
+      <div class="row">${x.edit_steps ? `<span class="ok small">Исправление записано: ${x.edit_steps} шагов</span>` : `<span class="warn small">Исправление ещё не записано</span>`}
+        <button class="sm primary" data-erec="${esc(x.site)}">● ${x.edit_steps ? "Перезаписать" : "Записать"} исправление</button></div>
+      ${x.samples.some(s => s.title) ? `<div class="small muted">Пример: ${x.samples.slice(0, 3).map(s => `<br>${esc(s.code)} → «${esc(s.title)}»`).join("")}</div>` : ""}
+    </div>`).join("") : `<div class="muted small">Нет выставленных объявлений за эту дату на выбранных сайтах.</div>`;
+    status();
+  }
+  m.addEventListener("click", async e => {
+    const sv = e.target.closest("[data-esave]"); if(sv){ await post("/api/edit/site", {site: sv.dataset.esave, edit_url: m.querySelector(`[data-eurl="${sv.dataset.esave}"]`).value}); toast("Сохранено"); return; }
+    const rc = e.target.closest("[data-erec]"); if(rc){
+      const sid = rc.dataset.erec; const u = m.querySelector(`[data-eurl="${sid}"]`).value; await post("/api/edit/site", {site: sid, edit_url: u});
+      alert("Сейчас откроется вкладка с одним из выставленных объявлений (или страница из поля выше).\n\nЗапишите: откройте редактирование → нажмите на поле названия → очистите его → кнопка «Название» в панели Donini → нажмите «Следующий клик = Опубликовать» → «Mentés/Сохранить» → «Готово — сохранить сценарий».\n\nЕсли объявление нужно сначала найти — впишите код кнопкой «Код» в поиск.");
+      await extRecord(sid, "__edit"); return;
+    }
+  });
+  showPrev();
+}
+let editsRefresh = null;
+
+// ---------- товары перетаскиванием (без проводника) ----------
+const UP = {};   // line -> {done,total,msg,err}
+const UP_EXT = /\.(jpe?g|png|webp|heic|heif|bmp|gif|zip|txt)$/i;
+const LINE_IC = (l) => l.id === "site" ? "🌐" : /кош/i.test(l.name) ? "👛" : /пух|курт/i.test(l.name) ? "🧥" : /сум|рюк/i.test(l.name) ? "👜" : "📦";
+function renderDrops(){
+  if(!S) return;
+  const act = S.products.filter(p => p.status !== "archived");
+  for(const box of $$("[data-drops]")){
+    const mode = box.dataset.drops;
+    const lines = S.lines.filter(l => mode === "all" || (mode === "site" ? l.id === "site" : l.id !== "site"));
+    setHTML(box, lines.map(l => {
+      const n = act.filter(p => p.line === l.id).length, u = UP[l.id];
+      return `<div class="drop" data-line="${esc(l.id)}"><span class="ic">${LINE_IC(l)}</span><b>${esc(l.id === "site" ? "Мой сайт" : l.name)}</b>
+        <div class="q">в очереди: ${n}</div>
+        ${l.id !== "site" ? `<label class="switch small" data-linepause="${esc(l.id)}" style="justify-content:center;margin-top:6px" title="Выключенная очередь не выставляется в авто-режиме («Выставлять подряд», «без меня»)">
+          <input type="checkbox" ${l.paused ? "" : "checked"}> ${l.paused ? `<span class="warn">⏸ выключена</span>` : `<span class="ok">в выгрузке</span>`}</label>` : ""}
+        ${l.id !== "site" && n && !l.paused ? `<button class="sm ${EXT.auto && EXT.auto.line === l.id ? "stop" : "go"}" data-autoline="${esc(l.id)}" style="margin-top:6px" title="Выставлять подряд только эту очередь">${EXT.auto && EXT.auto.line === l.id ? "■ Идёт — стоп" : "▶ Выставлять"}</button>` : ""}
+        ${u && u.total && u.done < u.total ? `<div class="prog"><i style="width:${Math.round(u.done / u.total * 100)}%"></i></div><div class="q">загружаю ${u.done} из ${u.total} фото…</div>` : ""}
+        ${u && u.msg ? `<div class="msg ${u.err ? "e" : ""}">${esc(u.msg)}</div>` : ""}</div>`;
+    }).join(""));
+  }
+}
+async function collectDropped(dt){
+  const out = [];
+  const entries = [...(dt.items || [])].map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+  const walk = async (entry, path) => {
+    if(entry.isFile){
+      const f = await new Promise((res, rej) => entry.file(res, rej));
+      out.push({file: f, rel: path + f.name});
+    } else if(entry.isDirectory){
+      const reader = entry.createReader(); let batch;
+      do { batch = await new Promise((res, rej) => reader.readEntries(res, rej)); for(const e of batch) await walk(e, path + entry.name + "/"); } while(batch.length);
+    }
+  };
+  if(entries.length){ for(const e of entries) await walk(e, ""); }
+  else for(const f of dt.files || []) out.push({file: f, rel: f.name});
+  return out;
+}
+async function uploadTo(line, items){
+  items = items.filter(x => UP_EXT.test(x.rel));
+  if(!items.length){ UP[line] = {msg: "Не нашёл фото в перетащенном", err: true}; renderDrops(); return; }
+  const u = UP[line] = {done: 0, total: items.length, msg: ""};
+  renderDrops();
+  try{
+    const {token} = await post("/api/upload/begin", {line});
+    let i = 0;
+    const worker = async () => {
+      while(i < items.length){
+        const it = items[i++];
+        const r = await fetch(`/api/upload/file?token=${token}&rel=${encodeURIComponent(it.rel)}`, {method:"POST", body: it.file});
+        if(!r.ok) throw new Error("не загрузился " + it.rel);
+        u.done++; if(u.done % 5 === 0 || u.done === u.total) renderDrops();
+      }
+    };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    const r = await post("/api/upload/end", {token});
+    u.msg = `✓ Добавлено товаров: ${r.folders}${r.files ? ` (+ ${r.files} отдельных фото)` : ""}. Через пару секунд появятся в очереди.`;
+  }catch(e){ u.msg = "⚠️ " + e.message; u.err = true; }
+  u.total = 0; renderDrops(); setTimeout(refresh, 2000);
+  setTimeout(() => { if(UP[line] === u){ delete UP[line]; renderDrops(); } }, 15000);
+}
+document.addEventListener("dragover", e => { e.preventDefault(); const d = e.target.closest && e.target.closest(".drop"); $$(".drop.over").forEach(x => x !== d && x.classList.remove("over")); if(d) d.classList.add("over"); });
+document.addEventListener("dragleave", e => { const d = e.target.closest && e.target.closest(".drop"); if(d && !d.contains(e.relatedTarget)) d.classList.remove("over"); });
+document.addEventListener("drop", async e => {
+  e.preventDefault();
+  $$(".drop.over").forEach(x => x.classList.remove("over"));
+  const d = e.target.closest && e.target.closest(".drop");
+  if(!d){ return; }
+  const items = await collectDropped(e.dataTransfer);
+  uploadTo(d.dataset.line, items);
+});
+let pickLine = null;
+document.addEventListener("click", async e => {
+  const lp = e.target.closest("[data-linepause]");
+  if(lp){ e.stopPropagation(); if(e.target.tagName !== "INPUT") return;  // клик по подписи сам переключит галочку
+    const lid = lp.dataset.linepause, paused = !e.target.checked;
+    await post(`/api/line/${encodeURIComponent(lid)}/pause`, {paused});
+    const l = S.lines.find(x => x.id === lid); if(l) l.paused = paused;
+    toast(paused ? `⏸ Очередь «${l ? l.name : lid}» выключена — авто-режим её не берёт` : `▶ Очередь «${l ? l.name : lid}» включена`);
+    await refresh(); return; }
+}, true);
+document.addEventListener("click", e => { const ab = e.target.closest("[data-autoline]"); if(ab){ e.stopPropagation(); autoStartLine(ab.dataset.autoline); return; } if(e.target.closest("[data-linepause]")) return; const d = e.target.closest(".drop"); if(!d) return; pickLine = d.dataset.line; $("#dirPick").value = ""; $("#dirPick").click(); });
+$("#dirPick").onchange = (e) => {
+  const files = [...e.target.files].map(f => ({file: f, rel: f.webkitRelativePath || f.name}));
+  if(pickLine && files.length) uploadTo(pickLine, files);
+};
+
+
+// ---------- скачать фото: 微商相册 и свой сайт ----------
+let SHOPS = [], wooListsLoaded = false;
+const boardLines = () => S ? S.lines.filter(l => l.id !== "site") : [];
+const lineOpts = (cur) => boardLines().map(l => `<option value="${esc(l.id)}" ${l.id === cur ? "selected" : ""}>${esc(l.name)}</option>`).join("");
+async function loadPhotosPage(){
+  try{ SHOPS = (await api("/api/szwego/shops")).shops; }catch(e){ SHOPS = []; }
+  renderShops();
+  const pl = $("#pullLine"), cur = pl.value || (()=>{try{return localStorage.getItem("pullLine")}catch(e){return null}})();
+  pl.innerHTML = `<option value="__auto">✨ Авто — по категории сайта</option>` + lineOpts(cur);
+  pl.value = cur || "__auto";
+  catRefresh(false);
+  pullStatus();
+}
+let catRefreshing = false, catRefreshedAt = 0;
+// запрос к программе с ограничением по времени: если сайт doninisklep.com «висит», каталог не замирает
+async function fetchT(url, ms = 30000){
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), ms);
+  try { return await (await fetch(url, {signal: ctl.signal})).json(); } finally { clearTimeout(t); }
+}
+async function catRefresh(manual){
+  if(catRefreshing && !manual) return;
+  if(CAT.running.size && !manual) return;
+  catRefreshing = true; catRefreshedAt = Date.now();
+  const btn = $("#catReload"); if(btn) btn.disabled = true;
+  if(!$("#catCats").children.length) $("#catCats").innerHTML = `<span class="muted small">Загружаю категории с сайта…</span>`;
+  try{
+    let listsErr = "";
+    try{ const r = await fetchT("/api/woo/lists?fresh=1"); if(!r.categories) listsErr = r.detail || "сайт не ответил"; if(r.categories){ wooListsLoaded = true;
+      const cats = r.categories.filter(c => c.count > 0).sort((a, b) => b.count - a.count);
+      let sc = ""; try{ sc = localStorage.getItem("catCat") || ""; }catch(e){}
+      if(sc && !cats.some(c => String(c.id) === sc)) sc = "";
+      CAT.cat = sc;
+      $("#catCats").innerHTML = `<button class="chip ${sc ? "" : "sel"}" data-cat="">Все товары</button>` + cats.map(c => `<button class="chip ${String(c.id) === sc ? "sel" : ""}" data-cat="${c.id}">${esc(c.name)} · ${c.count}</button>`).join(""); } }catch(e){ listsErr = e.name === "AbortError" ? "сайт doninisklep.com долго не отвечает" : String(e.message || e); }
+    if(listsErr && !$("#catCats [data-cat]")){
+      $("#catCats").innerHTML = `<span class="warn small">⚠️ Категории не загрузились: ${esc(listsErr)}.</span> <button class="sm" onclick="catRefresh(true)">⟳ Ещё раз</button>`;
+    }
+    try{ const b = await fetchT("/api/woo/brands?fresh=1"); if(b.brands) $("#catBrand").innerHTML = `<option value="">все бренды</option>` + b.brands.filter(x => x.count).map(x => `<option value="${x.id}">${esc(x.name)} (${x.count})</option>`).join("");
+      try{ const sb = localStorage.getItem("catBrand") || ""; if([...$("#catBrand").options].some(o => o.value === sb)) $("#catBrand").value = sb; }catch(e){} }catch(e){}
+    await catLoad(true);
+    if(manual) toast("✓ Каталог обновлён с сайта");
+  } finally { catRefreshing = false; if(btn) btn.disabled = false; }
+}
+// пока открыт раздел «Скачать фото» — каталог сам подтягивает новые товары с сайта раз в 2 минуты
+setInterval(() => { if(page === "photos" && CAT.page === 1 && !$("#catSearch").value && Date.now() - catRefreshedAt > 110000) catRefresh(false); }, 20000);
+function renderShops(){
+  const box = $("#szShops");
+  if(!SHOPS.length){ box.innerHTML = `<div class="empty">Пока нет альбомов. Нажмите «🌐 Открыть 微商相册 в браузере» и откройте альбом поставщика.</div>`; return; }
+  box.innerHTML = SHOPS.map(sh => `<div class="sc" data-shop="${esc(sh.id)}" style="margin-top:8px">
+      <span style="min-width:200px"><b>${esc(sh.name)}</b> <button class="sm" data-sh="rename" title="Переименовать">✏️</button><br><span class="small muted">разделов: ${sh.tags.length}</span></span>
+      <span class="row">
+        <select data-k="tag" style="max-width:240px"><option value="">весь альбом</option>${sh.tags.map(t => `<option value="${esc(t.id)}">${esc(t.name)} (${t.count})</option>`).join("")}</select>
+        <select data-k="line">${lineOpts((()=>{try{return localStorage.getItem("szLine_" + sh.id)}catch(e){return null}})())}</select>
+        <label class="switch small"><input type="checkbox" data-k="new" checked> только новые</label>
+        <button class="sm go" data-sh="go">⬇ Скачать в очередь</button>
+        <button class="sm" data-sh="open">Открыть</button>
+        <button class="sm danger" data-sh="del" title="Убрать из списка">✕</button>
+      </span></div>`).join("");
+}
+$("#szShops").addEventListener("change", e => { const row = e.target.closest("[data-shop]"); if(row && e.target.dataset.k === "line"){ try{ localStorage.setItem("szLine_" + row.dataset.shop, e.target.value); }catch(er){} } });
+$("#szShops").addEventListener("click", async e => {
+  const b = e.target.closest("[data-sh]"); if(!b) return;
+  const row = b.closest("[data-shop]"), sh = SHOPS.find(x => x.id === row.dataset.shop);
+  if(b.dataset.sh === "open"){ if(!EXT.ok) return alert("Расширение в браузере не отвечает."); ext({type:"openTab", url: sh.url}); return; }
+  if(b.dataset.sh === "rename"){ const n = prompt("Название альбома:", sh.name); if(n){ await post("/api/szwego/shop/rename", {id: sh.id, name: n}); loadPhotosPage(); } return; }
+  if(b.dataset.sh === "del"){ if(confirm("Убрать альбом из списка? (откроете его в браузере — появится снова)")){ await post("/api/szwego/shop/rename", {id: sh.id, delete: true}); loadPhotosPage(); } return; }
+  if(b.dataset.sh === "go"){
+    if(!EXT.ok) return alert("Расширение в браузере не отвечает — скачивание из 微商相册 идёт через браузер (там вы вошли в аккаунт).");
+    const tagSel = row.querySelector('[data-k="tag"]');
+    const msg = {type:"szwegoAll", url: sh.url, tag: tagSel.value, tagName: tagSel.selectedOptions[0].textContent.replace(/\s*\(\d+\)$/, ""),
+      line: row.querySelector('[data-k="line"]').value, only_new: row.querySelector('[data-k="new"]').checked};
+    b.disabled = true; b.textContent = "Скачиваю… (ход — в журнале)";
+    const r = await ext(msg, 3600000);
+    b.disabled = false; b.textContent = "⬇ Скачать в очередь";
+    if(r && r.ok) alert(`Готово: «${r.tagName}» — в очередь ${r.done}, уже были ${r.skipped}, без размера ${r.noSize}${r.errors ? `, ошибок ${r.errors}` : ""}.`);
+    else if(r) alert("Не получилось: " + (r.error || ""));
+  }
+});
+$("#szOpen").onclick = () => { if(!EXT.ok) return alert("Расширение в браузере не отвечает."); ext({type:"openTab", url:"https://www.szwego.com/"}); };
+let CAT = {page: 1, items: [], cat: "", running: new Set()};
+async function catLoad(reset){
+  try{ catAllFLabel(); }catch(e){}
+  if(reset){ CAT.page = 1; CAT.items = []; }
+  const q = new URLSearchParams({category: CAT.cat, brand: $("#catBrand").value, search: $("#catSearch").value.trim(), page: CAT.page});
+  $("#catMore").classList.add("hidden");
+  if(reset) $("#catGrid").innerHTML = `<div class="empty">Загружаю товары с сайта…</div>`;
+  let r;
+  let er = "";
+  try{ r = await fetchT("/api/woo/catalog?" + q, 45000); }catch(e){ r = null; er = e.name === "AbortError" ? "Сайт doninisklep.com долго не отвечает." : "Программа не ответила."; }
+  if(!r || !r.products){ $("#catGrid").innerHTML = `<div class="empty">${esc(er || (r && r.detail) || "Сайт не подключён — «Мой сайт» → «⚙️ Подключение».")}<br><button class="sm" style="margin-top:8px" onclick="catRefresh(true)">⟳ Попробовать ещё раз</button></div>`; return; }
+  CAT.items = CAT.items.concat(r.products);
+  $("#catMore").classList.toggle("hidden", !r.more);
+  catRender();
+}
+const CAT_DONE = {}, CAT_FAIL = {};
+function toast(text, err){
+  const t = document.createElement("div"); t.className = "toast" + (err ? " err" : ""); t.textContent = text;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 3500);
+}
+function catRender(){
+  const hide = $("#catHide").checked;
+  const list = CAT.items.filter(p => !(hide && p.in_queue));
+  $("#catGrid").innerHTML = list.length ? list.map(p => `<div class="ptile${p.in_queue ? " done" : ""}" data-pid="${p.id}" title="${esc(p.name)}">
+      ${CAT_DONE[p.id] || p.in_queue ? `<span class="bdg ok">✓ в очереди</span>` : ""}
+      <img loading="lazy" src="${esc(p.img)}" alt="">
+      ${CAT.running.has(p.id) ? `<div class="ov"><div class="spin"></div>Скачиваю…</div>` :
+        CAT_DONE[p.id] && Date.now() - CAT_DONE[p.id].t < 4000 ? `<div class="ov ok">✓ Добавлено<br>в «${esc(CAT_DONE[p.id].line)}»</div>` :
+        CAT_FAIL[p.id] ? `<div class="ov err">⚠️ Не скачалось<br><span style="font-weight:400">нажмите ещё раз</span></div>` : ""}
+      <div class="pi"><b>${esc(p.brand || "")}</b>${esc(p.size || "")}<br><span class="muted">${p.price ? esc(p.price) + " zł · " : ""}${p.photos} фото${p.sku ? " · " + esc(p.sku) : ""}</span></div></div>`).join("")
+    : catEmptyMsg();
+}
+// пусто из-за фильтров — говорим, какой фильтр мешает, и даём сбросить одной кнопкой
+function catEmptyMsg(){
+  const br = $("#catBrand").value ? $("#catBrand").selectedOptions[0].textContent.replace(/\s*\(\d+\)$/, "") : "";
+  const se = $("#catSearch").value.trim();
+  const hide = $("#catHide").checked && CAT.items.length;
+  const why = [];
+  if(br) why.push(`бренд «${esc(br)}»`);
+  if(se) why.push(`поиск «${esc(se)}»`);
+  if(hide) why.push(`все найденные уже в очереди (снята галочка «скрыть» — покажет их)`);
+  if(!why.length) return `<div class="empty">В этой категории товаров нет</div>`;
+  return `<div class="empty">Ничего не найдено: в этой категории нет товаров с фильтром — ${why.join(", ")}.<br>
+    <button class="sm" style="margin-top:8px" onclick="$('#catBrand').value='';$('#catSearch').value='';$('#catHide').checked=false;catLoad(true)">✕ Сбросить фильтры</button></div>`;
+}
+async function catPull(ids){
+  ids = ids.filter(id => !CAT.running.has(id));
+  if(!ids.length) return;
+  ids.forEach(id => { CAT.running.add(id); delete CAT_FAIL[id]; }); catRender();
+  const ln = $("#pullLine").selectedOptions[0]?.textContent || "";
+  toast(ids.length > 1 ? `⬇ Скачиваю ${ids.length} товаров…` : `⬇ Скачиваю в очередь${$("#pullLine").value === "__auto" ? "" : " «" + ln + "»"}…`);
+  const r = await post("/api/woo/pull_ids", {ids, line: $("#pullLine").value});
+  if(r.ok === false){ alert(r.error); ids.forEach(id => CAT.running.delete(id)); catRender(); return; }
+  setTimeout(pullStatus, 800);
+}
+$("#catGrid").addEventListener("click", e => {
+  const t = e.target.closest(".ptile"); if(!t) return;
+  const p = CAT.items.find(x => String(x.id) === t.dataset.pid);
+  if(!p) return;
+  if(p.in_queue && !confirm("Этот товар уже лежит в очереди. Скачать ещё раз (будет вторая копия)?")) return;
+  catPull([p.id]);
+});
+// все товары по фильтру (например все сумки Gucci) — со всех страниц каталога, одной кнопкой
+function catFilterName(){
+  const cat = CAT.cat ? (($("#catCats [data-cat].sel") || {}).textContent || "").replace(/\s*·.*$/, "") : "";
+  const br = $("#catBrand").value ? $("#catBrand").selectedOptions[0].textContent.replace(/\s*\(\d+\)$/, "") : "";
+  const q = $("#catSearch").value.trim();
+  return [br, cat, q && `«${q}»`].filter(Boolean).join(" · ") || "весь каталог";
+}
+function catAllFLabel(){ $("#catAllF").textContent = `⬇ Скачать все: ${catFilterName()}`; }
+$("#catAllF").onclick = async () => {
+  const b = $("#catAllF"); b.disabled = true; const old = b.textContent; b.textContent = "Считаю товары…";
+  let r;
+  try{ r = await api("/api/woo/catalog_ids?" + new URLSearchParams({category: CAT.cat, brand: $("#catBrand").value, search: $("#catSearch").value.trim()})); }
+  catch(e){ return; }  // ошибку уже показали
+  finally{ b.disabled = false; b.textContent = old; }
+  const name = catFilterName();
+  if(!r.total) return alert(`${name}: товаров с фото нет.`);
+  if(!r.new.length){
+    if(!confirm(`${name}: все ${r.total} товаров уже лежат в очереди.\n\nСкачать их ещё раз (будут вторые копии)?`)) return;
+    return catPull(r.ids);
+  }
+  const skip = r.total - r.new.length;
+  if(!confirm(`${name}: ${r.total} товаров на сайте${skip ? `, из них ${skip} уже в очереди — их пропущу` : ""}.\n\nСкачать в очередь ${r.new.length} товаров?`)) return;
+  catPull(r.new);
+};
+$("#catAll").onclick = () => { const ids = CAT.items.filter(p => !p.in_queue).map(p => p.id); if(!ids.length) return alert("Все товары на странице уже в очереди."); if(confirm(`Скачать в очередь ${ids.length} товаров?`)) catPull(ids); };
+$("#catMore").onclick = () => { CAT.page++; catLoad(false); };
+$("#catReload").onclick = () => catRefresh(true);
+$("#catBrand").onchange = () => { try{ localStorage.setItem("catBrand", $("#catBrand").value); }catch(e){} catLoad(true); };
+try{ $("#catHide").checked = localStorage.getItem("catHide") === "1"; }catch(e){}
+$("#catHide").onchange = () => { try{ localStorage.setItem("catHide", $("#catHide").checked ? "1" : ""); }catch(e){} catRender(); };
+let catT = null; $("#catSearch").oninput = () => { clearTimeout(catT); catT = setTimeout(() => catLoad(true), 500); };
+$("#catCats").addEventListener("click", e => { const b = e.target.closest("[data-cat]"); if(!b) return; CAT.cat = b.dataset.cat; try{ localStorage.setItem("catCat", CAT.cat); }catch(e){} $$("#catCats [data-cat]").forEach(x => x.classList.toggle("sel", x === b)); catLoad(true); });
+$("#pullLine").onchange = (e) => { try{ localStorage.setItem("pullLine", e.target.value); }catch(er){} };
+async function pullStatus(){
+  let st = null; try{ st = await (await fetch("/api/woo/pull/status")).json(); }catch(e){ return; }
+  $("#pullStop").classList.toggle("hidden", !st.running);
+  $("#pullInfo").textContent = st.running ? `скачиваю ${st.done} из ${st.total}${st.errors ? `, ошибок ${st.errors}` : ""}…` : (st.msg || "");
+  // каждая плитка отмечается сразу, как только её товар скачался
+  let changed = false;
+  for(const [id, line] of Object.entries(st.done_ids || {})){
+    const k = Number(id);
+    if(CAT.running.has(k)){ CAT.running.delete(k); CAT_DONE[k] = {line, t: Date.now()}; changed = true; toast(`✓ Добавлено в очередь «${line}»`);
+      const it = CAT.items.find(x => x.id === k); if(it){ it.pulled = true; it.in_queue = true; } }
+  }
+  for(const id of st.failed_ids || []){ const k = Number(id); if(CAT.running.has(k)){ CAT.running.delete(k); CAT_FAIL[k] = 1; changed = true; toast("⚠️ Товар не скачался — сайт не ответил. Нажмите ещё раз.", true); } }
+  const pr = $("#catProg");
+  if(st.running || CAT.running.size){
+    pr.classList.remove("hidden");
+    $("#catProgT").textContent = `⬇ Скачиваю в очередь: ${st.done} из ${st.total}${st.errors ? ` · ошибок ${st.errors}` : ""}`;
+    $("#catProgBar").style.width = (st.total ? Math.round(st.done / st.total * 100) : 5) + "%";
+  } else if(Object.keys(st.done_ids || {}).length){
+    pr.classList.remove("hidden");
+    const lines = [...new Set(Object.values(st.done_ids))];
+    $("#catProgT").textContent = `✓ Готово: добавлено ${Object.keys(st.done_ids).length} в очередь «${lines.join("», «")}»${st.errors ? ` · не скачалось ${st.errors}` : ""}`;
+    $("#catProgBar").style.width = "100%";
+  }
+  if(changed){ catRender(); setTimeout(catRender, 4200); refresh(); }
+  if(!st.running && CAT.running.size){
+    // скачалось — обновляем отметки «✓ скачан» на плитках
+    CAT.running.clear();
+    const n = CAT.page; const all = [];
+    for(let pg = 1; pg <= n; pg++){
+      const q = new URLSearchParams({category: CAT.cat, brand: $("#catBrand").value, search: $("#catSearch").value.trim(), page: pg});
+      try{ const r = await (await fetch("/api/woo/catalog?" + q)).json(); all.push(...(r.products || [])); if(pg === n) $("#catMore").classList.toggle("hidden", !r.more); }catch(e){}
+    }
+    if(all.length) CAT.items = all;
+    catRender(); refresh();
+  }
+  if((st.running || CAT.running.size) && page === "photos") setTimeout(pullStatus, 1000);
+}
+$("#pullStop").onclick = async () => { await post("/api/woo/pull/stop"); pullStatus(); };
+
+
+// ---------- обновления программы ----------
+let UPD = null;
+async function updLoad(force){
+  try{ UPD = await api("/api/update/status" + (force ? "?force=1" : "")); }catch(e){ return; }
+  $("#updLbl").textContent = UPD.available ? `Обновить до ${UPD.latest}` : `Версия ${UPD.current} · проверить`;
+  $("#updBtn").style.color = UPD.available ? "var(--ok)" : "";
+  $("#updBanner").innerHTML = UPD.available ? `<div class="banner" style="margin-bottom:14px;background:var(--ok-soft);color:var(--ok);border:1px solid var(--ok)">
+     ⬆ <b>Доступна новая версия ${esc(UPD.latest)}</b> (у вас ${esc(UPD.current)}).${UPD.notes ? ` <span class="small" style="opacity:.85">${esc(UPD.notes.split("\n")[0].slice(0, 140))}</span>` : ""}
+     <span class="spacer"></span><button class="sm go" id="updNow">Обновить сейчас</button></div>` : "";
+  const un = $("#updNow"); if(un) un.onclick = updInstall;
+  if($("#updInfo")){
+    $("#updInfo").innerHTML = `Ваша версия: <b>${esc(UPD.current)}</b>` + (UPD.ok ? ` · последняя: <b>${esc(UPD.latest || "—")}</b>${UPD.available ? " — <span class='ok'>можно обновить</span>" : " — <span class='ok'>актуальная</span>"}` : ` · <span class="warn">${esc(UPD.error || "")}</span>`);
+    if(document.activeElement !== $("#updRepo")) $("#updRepo").value = UPD.source || "";
+  }
+}
+async function updInstall(){
+  if(!UPD || !UPD.available) return;
+  if(!confirm(`Обновить программу до версии ${UPD.latest}?\n\nНастройки, ключи, сценарии и очередь сохранятся. Программа перезапустится сама (около 20 секунд).`)) return;
+  document.body.insertAdjacentHTML("beforeend", `<div class="modal-bg"><div class="modal" style="align-items:center;text-align:center"><div class="spin" style="border-top-color:var(--accent)"></div><b>Скачиваю обновление ${esc(UPD.latest)}…</b><span class="small muted">Программа перезапустится сама, окно откроется заново.</span></div></div>`);
+  const old = (await api("/api/version").catch(() => ({}))).version;
+  try{ const r = await post("/api/update/install"); if(r.ok === false){ alert(r.error); location.reload(); return; } }
+  catch(e){ alert("Не получилось скачать обновление: " + (e.message || e)); location.reload(); return; }
+  await waitRestart(old);
+}
+// ждём, пока программа перезапустится новой версией, и обновляем окно
+async function waitRestart(old, msgEl){
+  const t0 = Date.now();
+  while(Date.now() - t0 < 120000){
+    await new Promise(r => setTimeout(r, 1500));
+    try{
+      const r = await fetch("/api/version", {cache: "no-store"});
+      if(r.ok){ const v = (await r.json()).version; if(v && v !== old){ location.reload(); return; } }
+    }catch(e){}
+  }
+  document.querySelectorAll(".modal-bg .modal").forEach(m => m.insertAdjacentHTML("beforeend", `<span class="warn small">Программа не ответила за 2 минуты. Закройте окно и запустите её ярлыком <b>DoniniPoster</b> на рабочем столе.</span>`));
+}
+$("#updBtn").onclick = async () => {
+  $("#updLbl").textContent = "Проверяю…";
+  await updLoad(true);
+  if(UPD.available) updInstall();
+  else alert(UPD.ok ? `У вас последняя версия: ${UPD.current}` : (UPD.error || "Не получилось проверить"));
+};
+$("#updSave").onclick = async () => { await post("/api/update/source", {repo: $("#updRepo").value}); await updLoad(true); toast("Сохранено"); };
+$("#updCheck").onclick = () => updLoad(true);
+
+
+// ---------- применить изменения программы без Запуск.bat ----------
+let PEND = null, WEB0 = null;
+async function pendLoad(){
+  try{ PEND = await api("/api/app/pending"); }catch(e){ return; }
+  if(WEB0 === null) WEB0 = PEND.web;
+  const code = PEND.restart, page = !code && PEND.web && PEND.web !== WEB0;
+  $("#applyBtn").style.display = code || page ? "" : "none";
+  $("#applyLbl").textContent = code ? "Применить изменения" : "Обновить окно";
+  $("#applyBanner").innerHTML = code || page ? `<div class="banner" style="margin-bottom:14px;background:var(--ok-soft);color:var(--ok);border:1px solid var(--ok)">
+     🔄 <b>Программу обновили</b> — ${code ? "нажмите, чтобы применить (перезапуск около 10 секунд)" : "нажмите, чтобы обновить окно"}.
+     <span class="spacer"></span><button class="sm go" id="applyNow">${code ? "Применить сейчас" : "Обновить окно"}</button></div>` : "";
+  const b = $("#applyNow"); if(b) b.onclick = applyChanges;
+}
+async function applyChanges(){
+  if(!PEND || !PEND.restart){ location.reload(); return; }
+  if(!confirm("Применить изменения программы?\n\nПрограмма перезапустится сама (около 10 секунд). Если сейчас идёт выставление — оно остановится, потом запустите заново.")) return;
+  const old = PEND.running;
+  document.body.insertAdjacentHTML("beforeend", `<div class="modal-bg" id="applyModal"><div class="modal" style="align-items:center;text-align:center"><div class="spin" style="border-top-color:var(--accent)"></div><b>Перезапускаю программу…</b><span class="small muted" id="applyMsg">Окно обновится само.</span></div></div>`);
+  try{ await post("/api/app/restart"); }catch(e){}
+  await waitRestart(old);
+}
+$("#applyBtn").onclick = applyChanges;
+pendLoad(); setInterval(pendLoad, 15000);
+
+// ---------- поиск товара по коду по всей программе ----------
+let gsT = null;
+async function searchModal(q){
+  q = (q || "").trim(); if(q.length < 2) return;
+  let r; try{ r = await api("/api/search?q=" + encodeURIComponent(q)); }catch(e){ return; }
+  const ST = {done:"✓", error:"ошибка", pending:"ждёт", running:"выставляет", skipped:"пропущен"};
+  const cards = r.items.map(h => `<div class="sr" data-pid="${h.id}">
+      <div class="row" style="justify-content:space-between;align-items:flex-start">
+        <div><span class="code">${esc(h.code)}</span> <button class="sm" data-a="copy" data-v="${esc(h.code)}" title="Скопировать код">📋</button>
+          <div>${esc(h.name)}</div>
+          <div class="small muted">${esc(h.line || "")} · ${h.size ? esc(h.size) + " · " : ""}${h.price ? esc(h.price) + " zł · " : ""}${h.n_photos} фото ·
+            ${h.status === "archived" ? `выставлен ${esc((h.archived_at || "").slice(0, 16).replace("T", " "))}` : `в очереди с ${esc((h.added || "").slice(0, 16).replace("T", " "))}`}</div></div>
+        <div class="row">
+          ${h.folder_exists ? `<button class="sm" data-a="folder" data-v="${esc(h.folder)}">📂 Папка</button>` : `<span class="small muted">папки нет${h.n_photos ? " (фото сохранены)" : ""}</span>`}
+          ${h.status !== "archived" ? `<button class="sm" data-a="texts">✏️ Текст</button>` : ""}
+          ${h.sites.some(x => x.status === "error") ? `<button class="sm primary" data-a="retry">🔁 Повторить ошибки</button>` : ""}
+        </div></div>
+      ${h.photos.length ? `<div class="ph">${h.photos.map(x => `<img loading="lazy" src="/api/thumb?path=${encodeURIComponent(x)}" data-a="zoom" data-v="${esc(x)}">`).join("")}</div>` : ""}
+      <div class="chips">${h.sites.map(x => x.status === "done" && x.url
+          ? `<a class="chip done" data-a="open" data-v="${esc(x.url)}" title="${esc(x.url)}">${esc(x.name)} ✓ открыть ↗</a>`
+          : `<span class="chip ${x.status}" title="${esc(x.error || "")}">${esc(x.name)}: ${ST[x.status] || x.status}${x.status === "done" ? " (без ссылки)" : ""}</span>`).join("") || `<span class="muted small">сайтов нет</span>`}</div>
+    </div>`).join("");
+  const m = modal(`<h3>🔎 «${esc(q)}» — найдено ${r.total}</h3>
+    <input id="srQ" value="${esc(q)}" placeholder="код или название" style="width:100%">
+    <div style="display:flex;flex-direction:column;gap:10px;max-height:64vh;overflow:auto">${cards || `<div class="empty">Ничего не найдено</div>`}</div>
+    <div class="row"><button data-m="close">Закрыть (Esc)</button></div>`, (a, close) => close());
+  m.querySelector(".modal").style.width = "min(900px,100%)";
+  const inp = m.querySelector("#srQ"); inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length);
+  inp.addEventListener("keydown", e => { if(e.key === "Enter"){ m.remove(); searchModal(inp.value); } });
+  m.addEventListener("click", async e => {
+    const b = e.target.closest("[data-a]"); if(!b) return;
+    const pid = b.closest("[data-pid]")?.dataset.pid, v = b.dataset.v;
+    if(b.dataset.a === "copy"){ try{ await navigator.clipboard.writeText(v); }catch(er){} toast("Код скопирован: " + v); }
+    if(b.dataset.a === "folder") post("/api/open_folder", {path: v});
+    if(b.dataset.a === "open") openExt(v);
+    if(b.dataset.a === "texts"){ m.remove(); textsModal(pid); }
+    if(b.dataset.a === "retry"){ await post(`/api/product/${pid}/retry`, {}); toast("Отправлено на повтор"); m.remove(); searchModal(q); }
+    if(b.dataset.a === "zoom") modal(`<img src="/api/thumb?path=${encodeURIComponent(v)}&big=1" style="max-width:100%;border-radius:10px"><div class="row"><button data-m="close">Закрыть</button></div>`, (a, c) => c());
+  });
+}
+$("#gSearch").addEventListener("keydown", e => { if(e.key === "Enter"){ searchModal(e.target.value); } if(e.key === "Escape") e.target.blur(); });
+
+// ---------- горячие клавиши ----------
+const PAGE_KEYS = ["home", "site", "boards", "photos", "manager", "sites", "lines", "help", "log", "settings"];
+function keysModal(){
+  const names = {home:"Главная", site:"Мой сайт", boards:"Доски", photos:"Скачать фото", manager:"Donini Manager", sites:"Сайты и сценарии", lines:"Виды товара", help:"Инструкция", log:"Журнал", settings:"Настройки"};
+  modal(`<h3>⌨ Горячие клавиши</h3><table class="keys">
+    <tr><td><kbd>Ctrl</kbd>+<kbd>K</kbd> или <kbd>/</kbd></td><td>Поиск товара по коду или названию</td></tr>
+    ${PAGE_KEYS.map((p, i) => `<tr><td><kbd>Alt</kbd>+<kbd>${(i + 1) % 10}</kbd></td><td>${names[p]}</td></tr>`).join("")}
+    <tr><td><kbd>Alt</kbd>+<kbd>A</kbd></td><td>Доски: ▶ выставлять подряд / ■ остановить</td></tr>
+    <tr><td><kbd>Alt</kbd>+<kbd>W</kbd></td><td>Мой сайт: ▶ загружать / ■ остановить</td></tr>
+    <tr><td><kbd>Alt</kbd>+<kbd>P</kbd></td><td>Фоновые сайты: пауза / старт</td></tr>
+    <tr><td><kbd>Alt</kbd>+<kbd>O</kbd></td><td>Открыть папку «Очередь»</td></tr>
+    <tr><td><kbd>Alt</kbd>+<kbd>R</kbd></td><td>Обновить окно</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>Закрыть окно / выйти из поля</td></tr>
+    <tr><td><kbd>?</kbd></td><td>Эта подсказка</td></tr></table>
+    <div class="row"><button class="primary" data-m="close">Понятно</button></div>`, (a, c) => c());
+}
+$("#keysBtn").onclick = keysModal;
+document.addEventListener("keydown", async e => {
+  const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName);
+  if(e.key === "Escape"){ const m = $$(".modal-bg").pop(); if(m){ m.remove(); e.preventDefault(); } return; }
+  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k" || (!typing && e.key === "/")){ e.preventDefault(); $("#gSearch").focus(); $("#gSearch").select(); return; }
+  if(!typing && e.key === "?"){ keysModal(); return; }
+  if(!e.altKey || e.ctrlKey) return;
+  const k = e.code;
+  const d = k.startsWith("Digit") ? Number(k.slice(5)) : null;
+  if(d !== null){ const pg = PAGE_KEYS[(d + 9) % 10]; if(pg){ e.preventDefault(); go(pg); } return; }
+  if(k === "KeyA"){ e.preventDefault(); if(EXT.auto) await autoStop(); else await autoStart(); toast(EXT.auto ? "■ Авто-выставление остановлено" : "▶ Авто-выставление запущено"); }
+  if(k === "KeyW"){ e.preventDefault(); await wooToggle(); toast(WOO && WOO.running ? "▶ Загрузка на сайт идёт" : "■ Загрузка на сайт остановлена"); }
+  if(k === "KeyP"){ e.preventDefault(); $("#toggleBtn").click(); }
+  if(k === "KeyO"){ e.preventDefault(); post("/api/open_folder", {}); }
+  if(k === "KeyR"){ e.preventDefault(); location.reload(); }
+});
+
+
+// ---------- галочки в очереди и действия с выбранными ----------
+const SEL = new Set();
+function renderBulk(siteMode, rows){
+  const box = siteMode ? $("#bulkSite") : $("#bulkBoards");
+  const ids = rows.map(p => p.id).filter(id => SEL.has(id));
+  if(!ids.length){ setHTML(box, ""); return; }
+  const lineOpts = S.lines.filter(l => (l.id === "site") === siteMode).map(l => {
+    const t = META.types.find(x => x.id === l.template); return `<option value="${esc(l.id)}">${esc(l.name)} (шаблон: ${esc(t ? t.label : l.template)})</option>`; }).join("");
+  setHTML(box, `<div class="bulk"><b>Выбрано: ${ids.length}</b>
+    <button class="sm" data-bulk="toend" title="Отметить все товары от последнего отмеченного и до конца списка">⤓ От него до конца</button>
+    <select data-bulksel="recent" title="Отметить товары, которые недавно попали в очередь"><option value="">☑ Добавить: недавно добавленные…</option><option value="30">за 30 минут</option><option value="60">за 1 час</option><option value="180">за 3 часа</option><option value="1440">за сутки</option></select>
+    <button class="sm" data-bulk="top" title="Эти товары выставятся раньше остальных">⏫ Выставить первыми</button>
+    <button class="sm" data-bulk="retry">🔁 Повторить ошибки</button>
+    <select data-bulksel="line"><option value="">➡ Перенести в вид товара…</option>${lineOpts}</select>
+    <button class="sm" data-bulk="price">💰 Цена…</button>
+    <button class="sm" data-bulk="size">📏 Размер…</button>
+    <select data-bulksel="template"><option value="">🧾 Шаблон текста…</option><option value="__line">как у вида товара</option>${tplOpts("")}</select>
+    <button class="sm" data-bulk="qc" title="Проверить фото выбранных товаров заново (битые, недокачанные, замыленные, повторы)">🧹 Проверить фото</button>
+    <button class="sm" data-bulk="texts_reset" title="Убрать свои тексты (✏️) — снова текст из шаблона">↺ Текст по шаблону</button>
+    <button class="sm" data-bulk="ai_brand" title="ИИ посмотрит фото выбранных товаров и поставит бренд (нужен ключ в «Настройки»)">🤖 Бренд по фото</button>
+    <button class="sm" data-bulk="brand_on" title="Выбранные товары — с брендом">🏷 С брендом</button>
+    <button class="sm" data-bulk="brand_off" title="Выбранные товары — без бренда (бренд не пишется нигде)">🚫 Без бренда</button>
+    <button class="sm danger" data-bulk="remove">🗑 Убрать</button>
+    <span class="spacer"></span><button class="sm" data-bulk="clear">✕ Снять выбор</button></div>`);
+}
+async function doBulk(action, value){
+  const ids = [...SEL];
+  if(!ids.length) return;
+  if(action === "clear"){ SEL.clear(); render(true); return; }
+  if(action === "ai_brand"){ toast(`🤖 Смотрю фото ${ids.length} товаров…`); const r = await post("/api/queue/ai_brand", {ids}); if(r.ok === false) return alert(r.error); toast(`🤖 Бренд найден: ${r.found}` + (r.miss ? `, не понял: ${r.miss}` : "")); return refresh(); }
+  if(action === "qc"){ const r = await post("/api/queue/qc_recheck", {ids}); toast(`🧹 Проверяю фото: ${r.count} товаров — через несколько секунд будет видно, что убрано`); setTimeout(refresh, 4000); return; }
+  if(action === "remove" && !confirm(`Убрать из очереди выбранные товары (${ids.length})?\n\nПапки переносятся в «_удалено» — их можно вернуть.`)) return;
+  if(action === "price"){ value = prompt(`Новая цена (зл) для ${ids.length} товаров:`); if(!value) return; }
+  if(action === "size"){ value = prompt(`Новый размер для ${ids.length} товаров (например 30x20x10):`); if(value === null) return; }
+  const r = await post("/api/products/bulk", {ids, action, value});
+  toast(`Готово: ${r.done}`);
+  if(action === "remove") SEL.clear();
+  refresh();
+}
+let SEL_LAST = null, SEL_SHIFT = false;
+for(const id of ["#qSite", "#qBoards"]) $(id).addEventListener("click", e => { if(e.target.dataset && e.target.dataset.sel) SEL_SHIFT = e.shiftKey; }, true);
+// «от выбранного до конца»: все товары, что в списке ниже последнего отмеченного
+function selectToEnd(siteMode){
+  const box = siteMode ? $("#qSite") : $("#qBoards");
+  const boxes = [...box.querySelectorAll("[data-sel]")];
+  let from = boxes.findIndex(b => b.dataset.sel === SEL_LAST);
+  if(from < 0) from = Math.max(...boxes.map((b, k) => SEL.has(b.dataset.sel) ? k : -1));
+  if(from < 0) return toast("Сначала отметьте товар, с которого начать", true);
+  boxes.slice(from).forEach(b => SEL.add(b.dataset.sel));
+  toast(`Выбрано с этого товара до конца: ${boxes.length - from}`); render(true);
+}
+function selectRecent(siteMode, minutes){
+  const since = Date.now() - minutes * 60000;
+  const rows = S.products.filter(p => p.status !== "archived" && (p.line === "site") === siteMode && new Date(p.added).getTime() >= since);
+  rows.forEach(p => SEL.add(p.id)); toast(`Выбрано добавленных за ${minutes >= 60 ? (minutes / 60) + " ч" : minutes + " мин"}: ${rows.length}`); render(true);
+}
+for(const id of ["#qSite", "#qBoards", "#bulkSite", "#bulkBoards"]){
+  $(id).addEventListener("change", e => {
+    const c = e.target;
+    if(c.dataset.sel){
+      const boxes = [...c.closest("table").querySelectorAll("[data-sel]")];
+      const i = boxes.indexOf(c), j = boxes.findIndex(b => b.dataset.sel === SEL_LAST);
+      if(SEL_SHIFT && j >= 0 && i >= 0){  // Shift+клик — все товары между прошлым и этим
+        boxes.slice(Math.min(i, j), Math.max(i, j) + 1).forEach(b => c.checked ? SEL.add(b.dataset.sel) : SEL.delete(b.dataset.sel));
+      } else { c.checked ? SEL.add(c.dataset.sel) : SEL.delete(c.dataset.sel); }
+      SEL_LAST = c.dataset.sel; SEL_SHIFT = false; render(true);
+    }
+    if(c.dataset.selall !== undefined){
+      const siteMode = c.dataset.selall === "1";
+      const lineF = siteMode ? "" : $("#qLineFilter").value, stF = siteMode ? "" : $("#qStateFilter").value;
+      S.products.filter(p => (showHist || p.status !== "archived") && (p.line === "site") === siteMode && (!lineF || p.line === lineF)
+        && (!stF || Object.values(p.sites).some(x => x.status === "error"))).slice(0, 300).forEach(p => c.checked ? SEL.add(p.id) : SEL.delete(p.id));
+      render(true);
+    }
+    if(c.dataset.bulksel === "line" && c.value){ const v = c.value; c.value = ""; doBulk("line", v); }
+    if(c.dataset.bulksel === "recent" && c.value){ const v = +c.value; c.value = ""; selectRecent(id === "#bulkSite", v); }
+    if(c.dataset.bulksel === "template" && c.value){ const v = c.value === "__line" ? "" : c.value; c.value = ""; doBulk("template", v); }
+  });
+  $(id).addEventListener("click", e => { const b = e.target.closest("[data-bulk]"); if(!b) return; if(b.dataset.bulk === "toend") return selectToEnd(id === "#bulkSite"); doBulk(b.dataset.bulk); });
+}
+
+// ---------- карточка товара ----------
+async function cardModal(pid){
+  let d; try{ d = await api(`/api/product/${pid}/card`); }catch(e){ return; }
+  let sel = [...d.photos], off = [...d.others];
+  const ST = {done:"✓ выставлен", error:"ошибка", pending:"ждёт", running:"выставляет", skipped:"пропущен"};
+  const ph = (list, isOff) => list.map((x, i) => `<div class="ph ${!isOff && i === 0 ? "main" : ""}" draggable="${!isOff}" data-i="${i}" data-off="${isOff ? 1 : 0}">
+      <img loading="lazy" src="/api/thumb?path=${encodeURIComponent(x)}">
+      ${isOff && d.qc_bad && d.qc_bad[x] ? `<span class="qcwhy" title="Убрано автоматически">🧹 ${esc(d.qc_bad[x])}</span>` : ""}
+      ${isOff ? `<span class="n" style="cursor:pointer">+ вернуть</span>` : `<span class="n">${i === 0 ? "⭐ главное" : i + 1}</span>
+      <div class="bt"><button data-ph="left" title="Левее">◀</button><button data-ph="main" title="Сделать главным">⭐</button><button data-ph="right" title="Правее">▶</button><button data-ph="off" title="Не использовать">✕</button></div>`}</div>`).join("");
+  const draw = () => `
+    <h3><span><span class="code">${esc(d.code)}</span> ${esc(d.name)}</span></h3>
+    <div class="grid2" style="gap:16px">
+      <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+        <b>Фото в объявлении: ${sel.length} <span class="small muted" style="font-weight:400">(нажмите на фото — откроется крупно; перетащите мышкой или ◀ ▶; первое — главное)</span></b>
+        <div class="card-ph" id="cpSel">${ph(sel, false) || `<span class="warn">Нет фото — верните ниже</span>`}</div>
+        ${off.length ? `<b class="small muted">Не используются («+ вернуть» — снова в объявление; нажмите на фото — посмотреть):</b><div class="card-ph off" id="cpOff">${ph(off, true)}</div>` : ""}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <label class="field">Вид товара<select id="cdLine">${d.lines.map(l => `<option value="${esc(l.id)}" ${l.id === d.line ? "selected" : ""}>${esc(l.name)}</option>`).join("")}</select></label>
+        <label class="field">🧾 Шаблон текста<select id="cdTplSel"><option value="">как у вида товара: ${esc((d.lines.find(l => l.id === d.line) || {}).template_label || "—")}</option>${d.types.map(t => `<option value="${esc(t.id)}" ${t.id === d.template_own ? "selected" : ""}>${esc(t.label)}</option>`).join("")}</select></label>
+        <div class="small muted" style="margin-top:-6px">Поправить сам текст шаблона — <a data-m="mgr" style="cursor:pointer">✏️ открыть в Donini Manager</a>, текст только этого товара — «✏️ Тексты».</div>
+        <label class="field">Бренд ${d.brand_manual ? "" : `<span class="muted">(найден автоматически)</span>`}<input id="cdBrand" value="${esc(d.brand)}"></label>
+        <label class="switch small"><input type="checkbox" id="cdWithBrand" ${d.no_brand ? "" : "checked"}> выгружать с брендом <span class="muted">(снять — бренд не пишется нигде)</span></label>
+        <div class="row">
+          <label class="field" style="flex:1">${(d.lines.find(l => l.id === d.line) || {}).template === "phonecases" || d.template === "phonecases" ? "📱 Модель телефона (например iPhone 18 Pro Max)" : "Размер"}<input id="cdSize" value="${esc(d.size)}"></label>
+          <label class="field">Цена, зл<input id="cdPrice" class="mini" value="${esc(d.price ?? "")}"></label>
+        </div>
+        <div class="field">Сайты для этого товара
+          <div class="chips">${d.sites.map(x => x.status === "done"
+            ? `<span class="chip done" ${x.url ? `data-open="${esc(x.url)}" style="cursor:pointer"` : ""}>${esc(x.name)} ✓${x.url ? " ↗" : ""}</span>`
+            : `<label class="switch chip ${x.status}" style="cursor:pointer" title="${esc(x.error || "")}"><input type="checkbox" data-site="${esc(x.id)}" ${x.status !== "skipped" ? "checked" : ""}> ${esc(x.name)} · ${ST[x.status] || x.status}</label>`).join("") || `<span class="muted small">нет</span>`}</div></div>
+        <div class="row">
+          <button data-m="texts">✏️ Тексты</button>
+          ${d.folder_exists ? `<button data-m="folder">📂 Папка</button>` : ""}
+          ${d.locked ? `<button data-m="reset" title="Все фото из папки, как было">↺ Фото как в папке</button>` : ""}
+        </div>
+      </div>
+    </div>
+    <div class="row"><button class="primary" data-m="save">Сохранить</button><button data-m="close">Закрыть</button></div>`;
+  const m = modal(draw(), async (act, close) => {
+    if(act === "close") return close();
+    if(act === "folder") return post("/api/open_folder", {path: d.folder});
+    if(act === "texts"){ close(); return textsModal(pid); }
+    if(act === "mgr"){ close(); const l = d.lines.find(x => x.id === $("#cdLine", m).value); return openManagerTpl($("#cdTplSel", m).value || (l && l.template) || d.template); }
+    if(act === "reset"){ await post(`/api/product/${pid}`, {photos_reset: true}); close(); toast("Фото — как в папке"); return refresh(); }
+    if(act === "save"){
+      if(!sel.length) return alert("Оставьте хотя бы одно фото");
+      const skip = {}; m.querySelectorAll("[data-site]").forEach(c => skip[c.dataset.site] = c.checked);
+      const body = {template: $("#cdTplSel", m).value, no_brand: !$("#cdWithBrand", m).checked, brand: $("#cdBrand", m).value, size: $("#cdSize", m).value, price: $("#cdPrice", m).value, line: $("#cdLine", m).value, skip_sites: skip};
+      if(sel.join("|") !== d.photos.join("|") || off.length !== d.others.length) body.photos = sel;
+      await post(`/api/product/${pid}`, body);
+      close(); toast("✓ Карточка сохранена"); refresh();
+    }
+  });
+  const box = m.querySelector(".modal"); box.style.width = "min(1080px,100%)";
+  const redraw = () => { const wb = $("#cdWithBrand", m).checked; d.no_brand = !wb; d.template_own = $("#cdTplSel", m).value; const keep = {b: $("#cdBrand", m).value, s: $("#cdSize", m).value, p: $("#cdPrice", m).value, l: $("#cdLine", m).value};
+    box.innerHTML = draw(); $("#cdBrand", m).value = keep.b; $("#cdSize", m).value = keep.s; $("#cdPrice", m).value = keep.p; $("#cdLine", m).value = keep.l; showTpl(); };
+  const showTpl = () => { const l = d.lines.find(x => x.id === $("#cdLine", m).value); const o = $("#cdTplSel", m).options[0]; o.textContent = "как у вида товара: " + (l ? (l.template_label || "—") : "—"); };
+  m.addEventListener("change", e => { if(e.target.id === "cdLine") showTpl(); });
+  m.addEventListener("click", e => {
+    const o = e.target.closest("[data-open]"); if(o){ openExt(o.dataset.open); return; }
+    const img = e.target.closest(".ph img");
+    if(img && !e.target.closest("[data-ph]")){
+      const phEl = img.closest(".ph"), isOff = phEl.dataset.off === "1";
+      const build = () => [...sel.map((x, k) => ({path: x, off: false, main: k === 0})), ...off.map(x => ({path: x, off: true}))];
+      lightbox(build(), (isOff ? sel.length : 0) + +phEl.dataset.i, (it, a) => {
+        if(a === "main"){ sel.unshift(sel.splice(sel.indexOf(it.path), 1)[0]); }
+        if(a === "off"){ off.push(sel.splice(sel.indexOf(it.path), 1)[0]); }
+        if(a === "on"){ sel.push(off.splice(off.indexOf(it.path), 1)[0]); }
+        redraw();
+        const items = build(); return {items, index: items.findIndex(x => x.path === it.path)};
+      });
+      return;
+    }
+    const offEl = e.target.closest('.ph[data-off="1"] .n') && e.target.closest('.ph[data-off="1"]');
+    if(offEl){ sel.push(off.splice(+offEl.dataset.i, 1)[0]); return redraw(); }
+    const b = e.target.closest("[data-ph]"); if(!b) return;
+    const i = +b.closest(".ph").dataset.i;
+    if(b.dataset.ph === "left" && i > 0) [sel[i - 1], sel[i]] = [sel[i], sel[i - 1]];
+    if(b.dataset.ph === "right" && i < sel.length - 1) [sel[i + 1], sel[i]] = [sel[i], sel[i + 1]];
+    if(b.dataset.ph === "main") sel.unshift(sel.splice(i, 1)[0]);
+    if(b.dataset.ph === "off") off.push(sel.splice(i, 1)[0]);
+    redraw();
+  });
+  let dragI = null;
+  m.addEventListener("dragstart", e => { const p = e.target.closest('.ph[data-off="0"]'); if(p) dragI = +p.dataset.i; });
+  m.addEventListener("dragover", e => { if(dragI !== null && e.target.closest('.ph[data-off="0"]')) e.preventDefault(); });
+  m.addEventListener("drop", e => { const p = e.target.closest('.ph[data-off="0"]'); if(p && dragI !== null){ e.preventDefault(); e.stopPropagation(); const to = +p.dataset.i; sel.splice(to, 0, sel.splice(dragI, 1)[0]); dragI = null; redraw(); } });
+}
+
+
+// ---------- просмотр фото в полном размере (карточка товара) ----------
+// items: [{path, off}], onChange(i, action) — «main» | "off" | "on"
+function lightbox(items, start, onChange){
+  let i = start;
+  const el = document.createElement("div"); el.className = "lb";
+  const draw = () => {
+    const it = items[i];
+    el.innerHTML = `<div class="top"><b>Фото ${i + 1} из ${items.length}</b>
+        <span class="tag" style="background:${it.off ? "var(--err-soft);color:var(--err)" : "var(--ok-soft);color:var(--ok)"}">${it.off ? "не используется" : (it.main ? "⭐ главное" : "в объявлении")}</span>
+        <span class="spacer"></span>
+        ${onChange ? (it.off ? `<button class="go" data-lb="on">↩ Вернуть в объявление</button>` :
+          `${it.main ? "" : `<button data-lb="main">⭐ Сделать главным</button>`}<button class="stop" data-lb="off">✕ Не использовать</button>`) : ""}
+        <button data-lb="close">Закрыть (Esc)</button></div>
+      <div class="stage"><button class="nav2" style="left:16px" data-lb="prev">‹</button>
+        <img src="/api/photo?path=${encodeURIComponent(it.path)}" onerror="this.src='/api/thumb?path=${encodeURIComponent(it.path)}&big=1'">
+        <button class="nav2" style="right:16px" data-lb="next">›</button></div>
+      <div class="strip">${items.map((x, k) => `<img src="/api/thumb?path=${encodeURIComponent(x.path)}" class="${k === i ? "on" : ""} ${x.off ? "off" : ""}" data-k="${k}">`).join("")}</div>`;
+  };
+  const act = (a) => {
+    if(a === "close"){ el.remove(); removeEventListener("keydown", key, true); return; }
+    if(a === "prev") i = (i - 1 + items.length) % items.length;
+    if(a === "next") i = (i + 1) % items.length;
+    if((a === "main" || a === "off" || a === "on") && onChange){ const r = onChange(items[i], a); if(r){ items = r.items; i = Math.min(r.index ?? i, items.length - 1); } }
+    draw();
+  };
+  const key = (e) => {
+    if(e.key === "Escape"){ e.stopPropagation(); e.preventDefault(); act("close"); }
+    else if(e.key === "ArrowLeft") act("prev"); else if(e.key === "ArrowRight") act("next");
+    else if(e.key === "Delete" && onChange) act(items[i].off ? "on" : "off");
+  };
+  el.addEventListener("click", e => { const b = e.target.closest("[data-lb]"); if(b) return act(b.dataset.lb);
+    const t = e.target.closest("[data-k]"); if(t){ i = +t.dataset.k; draw(); } else if(e.target.classList.contains("stage")) act("close"); });
+  addEventListener("keydown", key, true);
+  draw(); document.body.appendChild(el);
+}
+
+
+// фото товара прямо из очереди: клик по миниатюре — крупный просмотр, правки сохраняются сразу
+async function quickPhotos(pid){
+  let d; try{ d = await api(`/api/product/${pid}/card`); }catch(e){ return; }
+  let sel = [...d.photos], off = [...d.others];
+  if(!sel.length && !off.length){ toast("У товара нет фото", true); return; }
+  const build = () => [...sel.map((x, k) => ({path: x, off: false, main: k === 0})), ...off.map(x => ({path: x, off: true}))];
+  lightbox(build(), 0, (it, a) => {
+    if(a === "main") sel.unshift(sel.splice(sel.indexOf(it.path), 1)[0]);
+    if(a === "off"){ if(sel.length <= 1){ toast("Должно остаться хотя бы одно фото", true); return null; } off.push(sel.splice(sel.indexOf(it.path), 1)[0]); }
+    if(a === "on") sel.push(off.splice(off.indexOf(it.path), 1)[0]);
+    post(`/api/product/${pid}`, {photos: sel}).then(() => { toast(a === "off" ? "Фото убрано из объявления" : a === "on" ? "Фото возвращено" : "Главное фото выбрано"); refresh(); });
+    const items = build(); return {items, index: items.findIndex(x => x.path === it.path)};
+  });
+}
+
+// ---------- обновление ----------
+let extChecked = false;
+function render(force){
+  if(!S) return;
+  renderHeader();
+  renderDrops();
+  if(page === "home") renderHome();
+  if(page === "site") renderQueue(true);
+  if(page === "boards"){ renderBoardsControls(); renderPub(); renderQueue(false); }
+  if(page === "sites") renderSites();
+  if(page === "log") renderLog();
+}
+async function refresh(){
+  try{
+    S = await (await fetch("/api/state?history=" + (showHist ? 1 : 0))).json();
+    render();
+  }catch(e){
+    $("#extPill").className = "pill bad"; $("#extPill").textContent = "программа не отвечает";
+  }
+}
+let extHelpShown = false, extOffSince = 0;
+async function refreshExt(){
+  await loadExt(); render();
+  // расширение молчит дольше 40 секунд — один раз сами показываем, что сделать
+  if(EXT.ok){ extOffSince = 0; return; }
+  if(!extOffSince) extOffSince = Date.now();
+  if(!extHelpShown && extChecked && Date.now() - extOffSince > 40000 && !$(".modal-bg")){ extHelpShown = true; extHelpModal("Доски не будут выставляться, пока расширение не на связи."); }
+}
+(async () => {
+  const lg = new Image(); lg.onload = () => { $("#brandBox").innerHTML = `<div style="width:100%"><img class="brand-logo" src="/logo.png" alt="DONINI"><span id="verInfo" style="display:block;margin-top:6px">…</span></div>`; }; lg.src = "/logo.png";
+  META = await api("/api/meta");
+  await refresh();
+  wooLoad();
+  setTimeout(async () => { await loadExt(); extChecked = true; render(); }, 1200);
+  setInterval(refresh, 2500);
+  setInterval(refreshExt, 4000);
+  setInterval(wooLoad, 5000);
+  setTimeout(() => updLoad(false), 3000); setInterval(() => updLoad(false), 600000);
+  let p = location.hash.slice(1) || (()=>{ try{ return localStorage.getItem("page"); }catch(e){ return null; } })() || "home";
+  const cardId = p.startsWith("card=") ? p.slice(5) : null;
+  if(cardId) p = "boards";
+  if(!TITLES[p]) p = "home";
+  go(p);
+  if(cardId) cardModal(cardId);
+})();
+</script>
+</body>
+</html>

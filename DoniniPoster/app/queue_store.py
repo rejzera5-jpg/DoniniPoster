@@ -239,6 +239,18 @@ def scan(cfg, state, log=print):
     line_folders = {l["folder"] for l in cfg["lines"]}
     if root.exists():
         for d in root.iterdir():
+            # новая папка прямо в «Очереди» (например «Ремни») — становится новой очередью в «Ещё»:
+            # шаблон подбирается по названию, сайты выберете в окне программы; пока сайтов нет — ничего не выставляется
+            if d.is_dir() and d.name not in line_folders and not d.name.startswith(("_", ".")) \
+                    and cfg.get("auto_new_queues", True) is not False:
+                try:
+                    line = C.new_line(cfg, d.name, folder=d.name)
+                    line_folders.add(d.name)
+                    cfg_changed = True
+                    log(f"🗂 Новая очередь «{d.name}» (папка в «Очереди»). Выберите для неё сайты в окне программы")
+                    continue
+                except ValueError:
+                    pass
             stray = (d.is_dir() and d.name not in line_folders) or (d.is_file() and d.suffix.lower() in IMG_EXT)
             if stray and str(d) not in _warned:
                 _warned.add(str(d))
@@ -346,7 +358,8 @@ def sync_sites(cfg, state, log=print):
 
 
 def product_finished(p):
-    return all(s["status"] in ("done", "skipped") for s in p["sites"].values())
+    # у товара ещё нет ни одного сайта (новая очередь без сайтов) — он не «выставлен везде», а ждёт
+    return bool(p["sites"]) and all(s["status"] in ("done", "skipped") for s in p["sites"].values())
 
 
 def archive_finished(cfg, state, log=print):

@@ -156,10 +156,76 @@ def load_config():
                     pass
                 l["folder"] = site_dir
                 save_config(cfg)
+        if not cfg.get("_ui5"):
+            _migrate_ui5(cfg)
+            save_config(cfg)
         Path(cfg["queue_root"]).mkdir(parents=True, exist_ok=True)
         for line in cfg["lines"]:
             (Path(cfg["queue_root"]) / line["folder"]).mkdir(parents=True, exist_ok=True)
         return cfg
+
+
+# ---- очереди (виды товара) в новом окне программы ----
+# У каждой очереди своё состояние: run = выставляет, pause = доделывает текущий и ждёт, stop = остановлена.
+# Состояние хранится в config.json — после перезагрузки компьютера работавшие очереди продолжают сами.
+RUN_STATES = ("run", "pause", "stop")
+MAIN_QUEUES = ["Сумки", "Кошельки", "Куртки", "Чехлы iPhone", "Мой сайт"]  # вкладки сверху; остальные — в «Ещё»
+
+
+def line_run(line):
+    st = line.get("run")
+    return st if st in RUN_STATES else "stop"
+
+
+def _migrate_ui5(cfg):
+    """Один раз при переходе на новое окно: Пуховики → Куртки, Чехлы → Чехлы iPhone, порядок вкладок, состояния очередей.
+    Внутренние id очередей не меняются — к ним привязаны записанные сценарии сайтов."""
+    root = Path(cfg["queue_root"])
+    for l in cfg["lines"]:
+        if l.get("name") == "Пуховики":
+            l["name"] = "Куртки"
+            old, new = root / str(l.get("folder") or ""), root / "Куртки"
+            try:  # папку переименовываем, только если в ней пусто (товаров нет — ссылаться не на что)
+                if l.get("folder") == "Пуховики" and old.is_dir() and not any(old.iterdir()) and not new.exists():
+                    old.rename(new)
+                    l["folder"] = "Куртки"
+            except OSError:
+                pass
+        if l.get("name") == "Чехлы" and l.get("template") == "phonecases":
+            l["name"] = "Чехлы iPhone"
+        if l.get("id") == "site":
+            site = get_site("doninisklep") or {}
+            l["run"] = "run" if site.get("enabled") else "stop"
+        else:
+            l["run"] = "stop"  # выставление на доски раньше включалось вручную — начинаем с остановленных
+        l["group"] = "main" if l.get("name") in MAIN_QUEUES else "more"
+    order = {n: i for i, n in enumerate(MAIN_QUEUES)}
+    cfg["lines"].sort(key=lambda l: (l["group"] != "main", order.get(l.get("name"), 99)))
+    cfg["_ui5"] = True
+
+
+TEMPLATE_GUESS = [("сумк", "bags"), ("кошел", "wallets"), ("ремн", "belts"), ("ремен", "belts"), ("шапк", "hats"),
+                  ("шарф", "scarves"), ("галст", "ties"), ("обув", "shoes"), ("кроссов", "shoes"), ("купальн", "swimsuits"),
+                  ("пухов", "downjackets"), ("куртк", "downjackets"), ("кепк", "caps"), ("чехл", "phonecases")]
+
+
+def new_line(cfg, name, folder=None, template=None, sites=None, group="more"):
+    """Новая очередь: своя папка в «Очереди», шаблон текста по названию, сайты — какие выбрали."""
+    import time as _t
+    name = (name or "").strip()[:60]
+    folder = re.sub(r'[<>:"/\\|?*]', "_", (folder or name).strip())[:80]
+    if not name or not folder:
+        raise ValueError("пустое название")
+    if any(l["name"].lower() == name.lower() for l in cfg["lines"]):
+        raise ValueError(f"очередь «{name}» уже есть")
+    low = name.lower()
+    tpl = template or next((t for k, t in TEMPLATE_GUESS if k in low), "bags")
+    lid = "q" + str(int(_t.time() * 1000))[-9:]
+    line = {"id": lid, "name": name, "folder": folder, "template": tpl, "default_size": "", "default_price": 0,
+            "sites": list(sites or []), "counter": 0, "run": "stop", "group": group}
+    cfg["lines"].append(line)
+    (Path(cfg["queue_root"]) / folder).mkdir(parents=True, exist_ok=True)
+    return line
 
 
 def save_config(cfg):

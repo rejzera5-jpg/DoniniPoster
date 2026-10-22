@@ -1,27 +1,32 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8">
 <style>
-  body{margin:0;width:360px;font:13px "Segoe UI",system-ui,sans-serif;background:#f6f3ee;color:#241f19}
-  @media (prefers-color-scheme: dark){ body{background:#17130f;color:#f1e9dd} .card{background:#201a14!important;border-color:#3a3025!important} .muted{color:#ab9d8c!important} select,input{background:#271f18!important;color:#f1e9dd!important;border-color:#3a3025!important} button.s{background:#271f18!important;color:#f1e9dd!important;border-color:#3a3025!important} }
-  header{padding:12px 14px;display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:15px}
-  .card{margin:0 12px 10px;padding:12px;border:1px solid #e3dbcd;border-radius:12px;background:#fff}
-  .muted{color:#7a7167;font-size:12px}
+  body{margin:0;width:370px;font:13px "Segoe UI",system-ui,sans-serif;background:#121014;color:#efe9e2}
+  header{padding:12px 14px;display:flex;justify-content:space-between;align-items:center}
+  header b{font-size:15px}
+  .card{margin:0 12px 10px;padding:12px;border:1px solid #332e39;border-radius:12px;background:#1d1a21}
+  .muted{color:#9d948a;font-size:12px}
   .row{display:flex;gap:8px;align-items:center}
-  img{width:64px;height:64px;object-fit:cover;border-radius:8px;background:#ddd}
-  .code{font-family:Consolas,monospace;font-weight:700;color:#8a5432;font-size:15px}
-  button{font:inherit;border:0;border-radius:9px;padding:9px 12px;cursor:pointer;background:#8a5432;color:#fff;font-weight:600}
-  button.s{background:#fff;color:#241f19;border:1px solid #e3dbcd;font-weight:500}
-  button:disabled{opacity:.5;cursor:default}
-  .sites{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
-  .sites label{display:flex;gap:4px;align-items:center;font-size:12px;border:1px solid #e3dbcd;border-radius:999px;padding:3px 8px;cursor:pointer}
-  .w{width:100%;margin-top:6px}
-  select,input{font:inherit;border:1px solid #e3dbcd;border-radius:8px;padding:6px;background:#f0ebe2}
-  .err{color:#b4442f}
+  .q{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid #2a2630}
+  .q:first-of-type{border-top:0}
+  .q .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .q .nm small{display:block;color:#9d948a}
+  .dot{width:9px;height:9px;border-radius:50%;background:#5a5462;flex:none}
+  .dot.run{background:#6ec98a} .dot.pause{background:#e8c46a} .dot.wait{background:#7fb0f0}
+  button{font:inherit;border:1px solid #332e39;border-radius:8px;padding:6px 10px;cursor:pointer;background:#26222b;color:#efe9e2}
+  button:hover{background:#302b36} button:disabled{opacity:.4;cursor:default}
+  button.go{background:#245c3a;border-color:#2f7449;color:#d8f5e2} button.pa{background:#5c4a1c;border-color:#6e5822;color:#f8e9bf} button.st{background:#5c2626;border-color:#6e2e2e;color:#f8d0c8}
+  button.cur{opacity:.35;cursor:default}
+  button.primary{background:#d18b56;border-color:#d18b56;color:#1c1108;font-weight:600}
+  .w{width:100%;margin-top:8px}
+  select,input{font:inherit;border:1px solid #332e39;border-radius:8px;padding:6px;background:#26222b;color:#efe9e2}
+  .err{color:#ef8a72} .ok{color:#6ec98a}
   h4{margin:0 0 8px;font-size:13px}
-  .auto{border-color:#3f7a52!important}
+  .n{font-size:11px;background:#26222b;border-radius:99px;padding:0 7px}
+  .n.e{background:#3d1f1a;color:#ef8a72}
 </style></head>
 <body>
-<header><span>Donini Poster</span><span class="muted" id="left"></span></header>
+<header><b>Donini Poster</b><span class="muted" id="left"></span></header>
 <div id="main"><div class="card muted">Подключаюсь к программе…</div></div>
 <script src="popup.js"></script>
 </body></html>

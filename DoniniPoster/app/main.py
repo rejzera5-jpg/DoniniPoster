@@ -597,10 +597,14 @@ async def amain(open_ui=True, autostart=False):
 
     tasks = [asyncio.create_task(server.serve()), asyncio.create_task(engine.run())]
     engine.log(f"Версия программы {APP_VERSION}, браузер: {engine.cfg.get('browser_channel') or 'встроенный'}")
+    boards_running = any(l["id"] != "site" and C.line_run(l) == "run" for l in engine.cfg["lines"])
     if open_ui:
         asyncio.get_event_loop().call_later(1.5, lambda: open_app_window(f"http://127.0.0.1:{port}", engine.cfg))
-    elif autostart and engine.cfg.get("launch_browser_with_extension", True) is not False:
+    if autostart:
         engine.log("🚀 Запуск вместе с Windows — работаю в фоне, окно программы: ярлык «Donini Poster»")
+    if (autostart or boards_running) and engine.cfg.get("launch_browser_with_extension", True) is not False:
+        # браузер с расширением нужен для досок: запускаем его в фоне сами (если ещё не запущен) —
+        # очереди, которые работали до выключения, продолжат выставление без ваших кнопок
         asyncio.get_event_loop().run_in_executor(None, start_browser_hidden)
     def _setup_app():
         ensure_store_icon(engine.log)
@@ -610,6 +614,7 @@ async def amain(open_ui=True, autostart=False):
         ensure_webview(engine.log)
     asyncio.get_event_loop().run_in_executor(None, _setup_app)
     engine.pick_browser = lambda: pick_browser_key(engine.cfg)
+    engine.show_window = lambda: open_app_window(f"http://127.0.0.1:{port}", engine.cfg)
     engine.browser_info = lambda: {"installed": installed_browsers(), "names": {k: v["name"] for k, v in BROWSERS.items()},
                                    "default": default_browser_key(), "current": pick_browser_key(engine.cfg),
                                    "auto": pick_browser_key({**engine.cfg, "user_browser": "auto"})}

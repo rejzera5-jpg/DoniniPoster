@@ -177,10 +177,12 @@ async function getAuto() { const { auto = null } = await chrome.storage.local.ge
 async function setAuto(a) { await chrome.storage.local.set({ auto: a }); }
 const FINISHED = ["done", "skipped", "error"];
 
-async function autoStart(pid, sites, line, lineName, allSites) {
+// owner: "program" — авто-режим включён кнопкой «Старт» в окне программы (программа сама решает, какие очереди идут);
+// mix — несколько очередей вперемешку: следующий товар берётся по порядку, который даёт программа
+async function autoStart(pid, sites, line, lineName, allSites, owner, mix) {
   const r = await startProduct(pid, sites);  // первый товар — только на его сайты, где он ещё не выставлен
   if (!r || !r.ok) return r;
-  await setAuto({ on: true, sites: allSites && allSites.length ? allSites : sites, pid, winId: r.winId, tried: [pid], count: 1, started: Date.now(), line: line || "", lineName: lineName || "" });
+  await setAuto({ on: true, sites: allSites && allSites.length ? allSites : sites, pid, winId: r.winId, tried: [pid], count: 1, started: Date.now(), line: line || "", lineName: lineName || "", owner: owner || "", mix: !!mix });
   await statsReset("выставлять подряд" + (lineName ? ` (${lineName})` : ""));
   log("▶ Авто-режим: товары будут открываться подряд" + (lineName ? ` — только «${lineName}»` : ""));
   return r;
@@ -194,6 +196,14 @@ async function autoSetLine(line, lineName, sites) {
   await setAuto(a);
   log(`▶ Авто-режим: теперь ${lineName ? `только «${lineName}»` : "все очереди"}`);
   return { ok: true };
+}
+// «Стоп» очереди в окне программы: сразу закрыть вкладки её товаров. Невыставленное остаётся в очереди программы.
+async function closeJobs(pids) {
+  const { jobs } = await getState();
+  const tabs = Object.entries(jobs).filter(([, j]) => pids.includes(j.pid) && !j.batch && !FINISHED.includes(j.status)).map(([t]) => Number(t));
+  for (const t of tabs) { try { await chrome.tabs.remove(t); } catch (e) {} }
+  if (tabs.length) log(`■ Закрыто вкладок: ${tabs.length} (очередь остановлена)`);
+  return { ok: true, closed: tabs.length };
 }
 async function autoStop(reason) {
   const a = await getAuto();
@@ -347,7 +357,7 @@ async function autoCheck() {
   if (a.editUntil && Date.now() < a.editUntil) { scheduleAutoCheck(a.editUntil - Date.now() + 200); return; }
   // следующий товар: первый в очереди, который в этом заходе ещё не открывали
   let st;
-  try { st = await api("/api/ext/state"); } catch (e) { return; }
+  try { st = await api(a.owner === "program" ? "/api/ext/state?run=1" : "/api/ext/state"); } catch (e) { return; }
   const queueWait = a.queueUntil && Date.now() < a.queueUntil;
   // исправление начинаем, только если оно успеет закончиться до следующего товара очереди — очередь не задерживаем
   const editFits = !queueWait || Date.now() + Math.min(30000, a.editDur || 18000) + 2000 <= a.queueUntil;
@@ -363,6 +373,7 @@ async function autoCheck() {
       if (p.edit) continue;
       if (a.line && p.line !== a.line) continue;  // авто-режим только по выбранной очереди
       const ids = p.sites.map((x) => x.id).filter((id) => !a.sites || !a.sites.length || a.sites.includes(id));
+      if (a.mix) { if (ids.length) { next = p; nextSites = ids; break; } continue; }  // порядок задаёт программа
       if (ids.length > nextSites.length) { next = p; nextSites = ids; }
       if (a.sites && ids.length >= a.sites.length) break; // полный товар — берём сразу
     }
@@ -376,7 +387,7 @@ async function autoCheck() {
     return;
   }
   // сайты, где этот товар уже выставлен раньше, не открываем повторно (иначе будут дубли объявлений)
-  const already = next.edit ? [] : (a.sites || []).filter((id) => !nextSites.includes(id));
+  const already = next.edit || a.mix ? [] : (a.sites || []).filter((id) => !nextSites.includes(id));
   if (already.length) {
     const nm = (id) => ((st.sites || []).find((x) => x.id === id) || {}).name || id;
     log(`ℹ️ Товар ${next.code} уже выставлен на: ${already.map(nm).join(", ")} — открываю только оставшиеся сайты (${nextSites.length})`);
@@ -695,7 +706,8 @@ const onMsg = (msg, sender, reply) => {
       // --- popup ---
       case "popupState": return api("/api/ext/state");
       case "start": await autoStop(); return startProduct(msg.pid, msg.sites);
-      case "autoStart": return autoStart(msg.pid, msg.sites, msg.line, msg.lineName, msg.allSites);
+      case "autoStart": return autoStart(msg.pid, msg.sites, msg.line, msg.lineName, msg.allSites, msg.owner, msg.mix);
+      case "closeJobs": return closeJobs(msg.pids || []);
       case "autoSetLine": return autoSetLine(msg.line, msg.lineName, msg.sites);
       case "batchStart": return batchStart(msg.line, msg.site, msg.target);
       case "batchStop": return batchStop("вручную");
@@ -871,7 +883,7 @@ chrome.runtime.onMessage.addListener(onMsg);
 // ---------- мост с окном программы Donini Poster ----------
 // Окно программы (отдельное приложение, не вкладка Chrome) управляет расширением через программу:
 // расширение постоянно спрашивает у программы «есть команда?» и отвечает результатом.
-const BRIDGE_ALLOWED = ["pubGet", "pubSet", "popupState", "autoState", "batchState", "autoStart", "autoStop", "autoSetLine",
+const BRIDGE_ALLOWED = ["pubGet", "pubSet", "popupState", "autoState", "batchState", "autoStart", "autoStop", "autoSetLine", "closeJobs",
   "batchStart", "batchStop", "start", "record", "managerSyncNow", "status", "openTab", "szwegoAll"];
 // открыть сайт в Chrome и показать окно (кнопки «Открыть …» в окне программы)
 async function openTabFront(url) {

@@ -81,6 +81,23 @@ def create_app(engine):
     async def index():
         return (WEB / "index.html").read_text("utf-8")
 
+    @app.get("/ui/{name}")
+    async def ui_file(name: str):
+        f = WEB / "ui" / name
+        if "/" in name or "\\" in name or ".." in name or not f.is_file():
+            raise HTTPException(404)
+        mt = {".js": "text/javascript", ".css": "text/css"}.get(f.suffix, "application/octet-stream")
+        return FileResponse(f, media_type=mt + ("; charset=utf-8" if f.suffix in (".js", ".css") else ""), headers={"Cache-Control": "no-store"})
+
+    @app.get("/old", response_class=HTMLResponse)
+    async def classic():
+        """Прежнее окно программы — запасное; новое окно открывает из него отдельные страницы (Инструменты)."""
+        return HTMLResponse((WEB / "classic.html").read_text("utf-8"), headers={"Cache-Control": "no-store"})
+
+    @app.get("/api/logs")
+    async def logs(n: int = 300):
+        return {"logs": list(engine.logs)[-max(1, min(n, 400)):]}
+
     @app.get("/api/state")
     async def state(history: int = 0):
         prods = list(engine.state["products"].values())
@@ -475,10 +492,7 @@ def create_app(engine):
     async def bridge_status():
         return {"online": bridge_online(), "version": bridge["version"]}
 
-    @app.post("/api/bridge/cmd")
-    async def bridge_cmd(req: Request):
-        data = await req.json()
-        msg = data.get("msg") or {}
+    async def bridge_send(msg, timeout=20):
         if not bridge_online():
             return {"ok": False, "offline": True, "error": "Расширение Donini в Chrome не отвечает"}
         cid = next(bridge["ids"])
@@ -486,12 +500,269 @@ def create_app(engine):
         bridge["wait"][cid] = fut
         await bridge["q"].put({"id": cid, "msg": msg})
         try:
-            res = await asyncio.wait_for(fut, timeout=float(data.get("timeout") or 20))
+            res = await asyncio.wait_for(fut, timeout=float(timeout or 20))
             return {"ok": True, "result": res}
         except asyncio.TimeoutError:
             return {"ok": False, "error": "Расширение не ответило вовремя"}
         finally:
             bridge["wait"].pop(cid, None)
+
+    @app.post("/api/bridge/cmd")
+    async def bridge_cmd(req: Request):
+        data = await req.json()
+        return await bridge_send(data.get("msg") or {}, data.get("timeout") or 20)
+
+    # ---------- очереди: Старт / Пауза / Стоп (новое окно программы) ----------
+    # Программа сама держит авто-режим расширения: есть запущенные очереди и товары — включает его,
+    # нет — выключает. Так выставление продолжается и после перезагрузки компьютера, без кнопок в браузере.
+    sup = {"known": set(), "last_start": 0.0, "offline_since": None, "warned": False, "resumed": False, "auto": None}
+
+    def board_lines(state=None):
+        return [l for l in engine.cfg["lines"] if l["id"] != "site" and (state is None or C.line_run(l) == state)]
+
+    def ext_site_ids():
+        return {s["id"] for s in ext_sites()}
+
+    def running_sites(lines):
+        ids = ext_site_ids()
+        return sorted({sid for l in lines for sid in l.get("sites", []) if sid in ids})
+
+    def sync_site_line():
+        """Очередь «Мой сайт» = загрузка на doninisklep.com (работает в программе, без браузера)."""
+        line = engine.line("site")
+        site = C.get_site("doninisklep")
+        if not line or not site:
+            return
+        want = C.line_run(line) == "run"
+        if bool(site.get("enabled")) != want:
+            w = engine.cfg.get("woo") or {}
+            if want and not (w.get("url") and w.get("ck") and w.get("cs") and w.get("wp_user") and w.get("wp_pass")):
+                return
+            site["enabled"] = want
+            C.save_site(site)
+            engine.ensure_workers()
+
+    async def supervise_once():
+        sync_site_line()
+        running = board_lines("run")
+        now = _time.time()
+        if not bridge_online():
+            sup["auto"] = None
+            if running and engine.cfg.get("_ext_browser"):
+                sup["offline_since"] = sup["offline_since"] or now
+                if not sup["warned"] and now - sup["offline_since"] > 240:
+                    sup["warned"] = True
+                    engine.log("⚠️ Расширение Donini в браузере не отвечает уже 4 минуты — выставление на доски стоит. "
+                               "Откройте окно программы: там видно, что сделать")
+            return
+        if sup["warned"]:
+            engine.log("✅ Расширение Donini снова на связи — продолжаю выставление")
+        sup["offline_since"], sup["warned"] = None, False
+        r = await bridge_send({"type": "status"}, 8)
+        if not r.get("ok") or not isinstance(r.get("result"), dict):
+            return
+        a = r["result"].get("auto")
+        sup["auto"] = a
+        mine = bool(a and a.get("owner") == "program")
+        if not running:
+            if mine:
+                await bridge_send({"type": "autoStop"}, 10)
+            return
+        if a and not mine:
+            return  # авто-режим запустили вручную в браузере (кнопкой расширения) — не мешаем
+        sites = running_sites(running)
+        names = ", ".join(l["name"] for l in running)
+        if mine:
+            if set(a.get("sites") or []) != set(sites) or a.get("lineName") != names:
+                await bridge_send({"type": "autoSetLine", "line": "", "lineName": names, "sites": sites}, 10)
+            return
+        prods = [p for p in ext_state_data(run=1)["products"] if not p.get("edit")]
+        if not prods or not sites:
+            return
+        pend = {p["id"] for p in prods}
+        # товары, которые уже пробовали в этом заходе и не вышли (ошибка), не гоняем по кругу: снова — только
+        # если появились новые товары или прошло 30 минут
+        if not (pend - sup["known"]) and now - sup["last_start"] < 1800:
+            return
+        p = prods[0]
+        sup["known"], sup["last_start"] = pend, now
+        res = await bridge_send({"type": "autoStart", "pid": p["id"], "sites": [s["id"] for s in p["sites"]],
+                                 "allSites": sites, "line": "", "lineName": names, "owner": "program", "mix": True}, 30)
+        if res.get("ok") and (res.get("result") or {}).get("ok") is not False:
+            if not sup["resumed"] and engine.__dict__.get("boot_resume"):
+                engine.log(f"▶ Программа запущена — продолжаю выставление: {names} (ждут {len(prods)})")
+                await engine.notify(f"▶ Donini Poster запущен, продолжаю: {names} (ждут {len(prods)})")
+            sup["resumed"] = True
+
+    async def supervisor_loop():
+        engine.boot_resume = bool(board_lines("run"))
+        await asyncio.sleep(5)
+        while True:
+            try:
+                await supervise_once()
+            except Exception as e:
+                engine.log(f"Ошибка управления очередями: {e}")
+            await asyncio.sleep(6)
+
+    @app.on_event("startup")
+    async def _start_supervisor():
+        asyncio.create_task(supervisor_loop())
+
+    def queue_view(l):
+        prods = [p for p in engine.state["products"].values() if p.get("line") == l["id"]]
+        active = [p for p in prods if p["status"] != "archived"]
+        today = str(__import__("datetime").date.today())
+        waiting = sum(1 for p in active if not p["sites"] or any(st.get("status") in ("pending", "running") for st in p["sites"].values()))
+        errors = sum(1 for p in active if any(st.get("status") == "error" for st in p["sites"].values()))
+        done_today = sum(1 for p in prods for st in p["sites"].values()
+                         if st.get("status") == "done" and str(st.get("at") or "").startswith(today))
+        run = C.line_run(l)
+        if l["id"] == "site":
+            site = C.get_site("doninisklep") or {}
+            working = run == "run" and bool(site.get("enabled"))
+            status = engine.site_status.get("doninisklep", "") if working else ""
+        else:
+            a = sup.get("auto")
+            working = run == "run" and bool(a and a.get("owner") == "program")
+            status = ""
+        return {"id": l["id"], "name": l["name"], "group": l.get("group") or ("main" if l["name"] in C.MAIN_QUEUES else "more"),
+                "run": run, "working": working, "status": status, "waiting": waiting, "errors": errors,
+                "done_today": done_today, "total": len(active), "sites": l.get("sites", []), "folder": l.get("folder", ""),
+                "template": l.get("template", ""), "default_price": l.get("default_price", 0),
+                "default_size": l.get("default_size", "")}
+
+    @app.get("/api/queues")
+    async def queues():
+        a = sup.get("auto")
+        return {"queues": [queue_view(l) for l in engine.cfg["lines"]], "ext_online": bridge_online(),
+                "ext_version": bridge["version"], "ext_browser": engine.cfg.get("_ext_browser"),
+                "manual_auto": bool(a and a.get("owner") != "program"), "auto": a,
+                "sites": [site_view(s) for s in C.load_sites()],
+                "telegram_ok": bool(engine.cfg["telegram"].get("token") and engine.cfg["telegram"].get("chat_id")),
+                "version": getattr(engine, "version", "?"), "counter": engine.cfg.get("code_counter"),
+                "queue_root": engine.cfg["queue_root"]}
+
+    @app.post("/api/queue/{lid}/run")
+    async def queue_run(lid: str, req: Request):
+        """state: run | pause | stop. together=False — при старте остальные очереди досок встают на паузу."""
+        d = await req.json()
+        state = d.get("state")
+        if state not in C.RUN_STATES:
+            raise HTTPException(400, "неизвестное действие")
+        cfg = C.load_config()
+        ln = next((l for l in cfg["lines"] if l["id"] == lid), None)
+        if not ln:
+            raise HTTPException(404, "Нет такой очереди")
+        if lid == "site" and state == "run":
+            w = cfg.get("woo") or {}
+            if not (w.get("url") and w.get("ck") and w.get("cs") and w.get("wp_user") and w.get("wp_pass")):
+                raise HTTPException(400, "Сначала подключите сайт: Настройки → Мой сайт")
+        if lid != "site" and state == "run" and not ln.get("sites"):
+            raise HTTPException(400, f"У очереди «{ln['name']}» не выбраны сайты — выберите их во вкладке «Сайты» этой очереди")
+        paused_others = []
+        if state == "run" and lid != "site" and not d.get("together"):
+            for o in cfg["lines"]:
+                if o["id"] not in ("site", lid) and C.line_run(o) == "run":
+                    o["run"] = "pause"
+                    paused_others.append(o["name"])
+        ln["run"] = state
+        ln["paused"] = state != "run"  # старое поле — для кнопки расширения в браузере
+        C.save_config(cfg)
+        engine.cfg = C.load_config()
+        if lid == "site" and state == "run":
+            n = 0
+            for p in engine.state.get("products", {}).values():
+                st = (p.get("sites") or {}).get("doninisklep")
+                if st and st.get("status") == "error":
+                    st.update(status="pending", error=None)
+                    n += 1
+            if n:
+                engine.save()
+        if state == "run":
+            sup["known"], sup["last_start"] = set(), 0.0  # запустить сразу, не ждать
+        if state == "stop" and lid != "site":
+            pids = [p["id"] for p in engine.state["products"].values() if p.get("line") == lid]
+            await bridge_send({"type": "closeJobs", "pids": pids}, 15)
+        words = {"run": "▶ запущена", "pause": "⏸ пауза (текущий товар доделается)", "stop": "■ остановлена"}
+        engine.log(f"Очередь «{ln['name']}»: {words[state]}" + (f"; на паузу: {', '.join(paused_others)}" if paused_others else ""))
+        try:
+            await supervise_once()
+        except Exception:
+            pass
+        return {"ok": True, "paused_others": paused_others}
+
+    @app.get("/api/queue/{lid}/products")
+    async def queue_products(lid: str, tab: str = "wait", limit: int = 300):
+        """Товары очереди для списка: wait — ждут, done — опубликованы, err — с ошибкой."""
+        from urllib.parse import quote
+        names = {s["id"]: s["name"] for s in C.load_sites()}
+        out = []
+        prods = [p for p in engine.state["products"].values() if p.get("line") == lid]
+        if tab == "done":
+            prods = [p for p in prods if any(st.get("status") == "done" for st in p["sites"].values())]
+            prods.sort(key=lambda p: max((str(st.get("at") or "") for st in p["sites"].values()), default=""), reverse=True)
+        elif tab == "err":
+            prods = [p for p in prods if p["status"] != "archived" and any(st.get("status") == "error" for st in p["sites"].values())]
+            prods.sort(key=lambda p: p["added"])
+        else:
+            prods = [p for p in prods if p["status"] != "archived"
+                     and (not p["sites"] or any(st.get("status") in ("pending", "running", "error") for st in p["sites"].values()))]
+            prods.sort(key=lambda p: p["added"])
+        from .brands import brand_of_product
+        for p in prods[:max(1, min(limit, 2000))]:
+            ph = p.get("photos") or []
+            out.append({"id": p["id"], "code": p["code"], "name": p["name"], "price": p.get("price"), "size": p.get("size", ""),
+                        "added": p.get("added"), "photos": len(ph), "archived": p["status"] == "archived",
+                        "thumb": "/api/thumb?path=" + quote(ph[0]) if ph else "",
+                        "template": p.get("template") or "", "own_text": bool(p.get("texts")), "no_brand": bool(p.get("no_brand")),
+                        "brand": brand_of_product(p), "qc_bad": len(p.get("qc_bad") or {}), "photos_manual": bool(p.get("photos_manual")),
+                        "folder": p.get("folder") or "", "archived_at": p.get("archived_at") or "",
+                        "sites": [{"id": sid, "name": names.get(sid, sid), "status": st.get("status"), "url": st.get("url") or "",
+                                   "at": st.get("at") or "", "error": st.get("error") or "",
+                                   "shot": "/api/shot?path=" + quote(st["shot"]) if st.get("shot") else ""}
+                                  for sid, st in p["sites"].items()]})
+        return {"products": out, "total": len(prods)}
+
+    @app.post("/api/queue_new")
+    async def queue_new(req: Request):
+        d = await req.json()
+        cfg = C.load_config()
+        try:
+            line = C.new_line(cfg, d.get("name"), template=d.get("template") or None, sites=d.get("sites") or [],
+                              group=d.get("group") or "more")
+        except ValueError as e:
+            raise HTTPException(400, f"Не получилось: {e}")
+        C.save_config(cfg)
+        engine.cfg = C.load_config()
+        engine.log(f"🗂 Новая очередь «{line['name']}» — папка «Очередь\\{line['folder']}»")
+        return {"ok": True, "line": line}
+
+    @app.post("/api/queue/{lid}/edit")
+    async def queue_edit(lid: str, req: Request):
+        """Название, шаблон, цена/размер по умолчанию, сайты, место (вкладки сверху или «Ещё»)."""
+        d = await req.json()
+        cfg = C.load_config()
+        ln = next((l for l in cfg["lines"] if l["id"] == lid), None)
+        if not ln:
+            raise HTTPException(404, "Нет такой очереди")
+        if "name" in d and str(d["name"]).strip():
+            ln["name"] = str(d["name"]).strip()[:60]
+        for k in ("template", "default_size"):
+            if k in d:
+                ln[k] = str(d[k] or "")
+        if "default_price" in d:
+            try:
+                ln["default_price"] = float(str(d["default_price"] or 0).replace(",", "."))
+            except ValueError:
+                raise HTTPException(400, "Цена — это число")
+        if "sites" in d and lid != "site":
+            known = {s["id"] for s in C.load_sites()}
+            ln["sites"] = [s for s in d["sites"] if s in known]
+        if d.get("group") in ("main", "more"):
+            ln["group"] = d["group"]
+        C.save_config(cfg)
+        engine.cfg = C.load_config()
+        return {"ok": True}
 
     # ---------- товары перетаскиванием в окно программы (без проводника) ----------
     uploads = {}
@@ -613,6 +884,8 @@ def create_app(engine):
         d["ext_seen"] = sorted({k for k, t in list(bridge["by"].items()) + list(_ext_seen.items()) if now - t < 600})
         d["bridge_online"] = bridge_online()
         d["choice"] = engine.cfg.get("user_browser") or "auto"
+        d["declined"] = engine.cfg.get("_browser_declined") or ""
+        d["ext_browser"] = engine.cfg.get("_ext_browser") or ""
         return d
 
     # восстановление из резервной копии: файлы кладём в data/_restore, программа перезапускается и подхватывает их
@@ -638,7 +911,27 @@ def create_app(engine):
                 continue
             t = dst / rel
             t.parent.mkdir(parents=True, exist_ok=True)
-            t.write_bytes(z.read(name))
+            raw = z.read(name)
+            if rel == "config.json":
+                # файл переноса без паролей: пароли и ключи, уже настроенные на этом компьютере, не затираем
+                import json as _json
+                try:
+                    new, cur = _json.loads(raw.decode("utf-8")), _json.loads(C.CONFIG_FILE.read_text("utf-8"))
+                    tg_new, tg_cur = new.get("telegram") or {}, cur.get("telegram") or {}
+                    for k in ("token", "chat_id"):
+                        if not tg_new.get(k) and tg_cur.get(k):
+                            tg_new[k] = tg_cur[k]
+                    new["telegram"] = tg_new
+                    if isinstance(new.get("woo"), dict) and isinstance(cur.get("woo"), dict):
+                        for k in ("ck", "cs", "wp_pass"):
+                            if not new["woo"].get(k) and cur["woo"].get(k):
+                                new["woo"][k] = cur["woo"][k]
+                    if not new.get("ai_key") and cur.get("ai_key"):
+                        new["ai_key"] = cur["ai_key"]
+                    raw = _json.dumps(new, ensure_ascii=False, indent=2).encode("utf-8")
+                except Exception:
+                    pass
+            t.write_bytes(raw)
             n += 1
         engine.log(f"♻️ Восстановление из резервной копии: файлов {n} — перезапускаю программу")
         fn = getattr(engine, "restart_self", None)
@@ -700,11 +993,38 @@ def create_app(engine):
     async def app_browser_set(req: Request):
         d = await req.json()
         cfg = C.load_config()
+        if d.get("decline"):
+            # «нет, остаюсь на прежнем браузере» — про этот браузер по умолчанию больше не спрашиваем
+            cfg["_browser_declined"] = str(d["decline"])
+            C.save_config(cfg)
+            engine.cfg = C.load_config()
+            return {"ok": True}
         cfg["user_browser"] = d.get("choice") or "auto"
+        if cfg["user_browser"] != "auto" and cfg.get("_ext_browser") != cfg["user_browser"]:
+            cfg.pop("_ext_browser", None)  # расширение в новом браузере программа найдёт сама, когда оно отзовётся
+        cfg.pop("_browser_declined", None)
         C.save_config(cfg)
         engine.cfg = C.load_config()
         engine.log(f"🌐 Браузер для досок: {cfg['user_browser']}")
         return {"ok": True}
+
+    @app.post("/api/browser/open_extensions")
+    async def browser_open_extensions():
+        """Установка расширения в новый браузер: открыть его страницу расширений и папку расширения."""
+        from . import main as M
+        key = M.pick_browser_key(engine.cfg)
+        path = M.browser_path(key) if key else None
+        page = "browser://extensions" if key == "yandex" else "edge://extensions" if key == "edge" else \
+            "opera://extensions" if key == "opera" else "chrome://extensions"
+        if path:
+            try:
+                subprocess.Popen([path] + M.browser_args() + [page], creationflags=0x08000000)
+            except Exception:
+                pass
+        ext = C.ROOT / "extension"
+        if sys.platform.startswith("win"):
+            os.startfile(str(ext))  # noqa
+        return {"ok": True, "browser": M.BROWSERS[key]["name"] if key else "", "page": page, "folder": str(ext)}
 
     # копия программы для другого человека: без ваших ключей, очереди, журнала и входов на сайты
     @app.get("/api/app/paths")
@@ -716,16 +1036,21 @@ def create_app(engine):
         import zipfile
         from datetime import date as _date
         try:
-            full = bool((await req.json()).get("full"))
+            d = await req.json()
         except Exception:
-            full = False
+            d = {}
+        full = bool(d.get("full"))
+        # move — перенос на другой компьютер: сценарии, шаблоны, настройки и очереди (без товаров);
+        # пароли, ключи и токен Telegram — только если отмечено secrets
+        move, secrets = bool(d.get("move")), bool(d.get("secrets"))
 
         def make():
             root = C.ROOT
             desk = Path(os.path.expanduser("~")) / "Desktop"
             if not desk.exists():
                 desk = root.parent
-            dst = desk / (f"DoniniPoster резервная копия {_date.today():%Y-%m-%d}.zip" if full else "DoniniPoster для передачи.zip")
+            dst = desk / (f"DoniniPoster резервная копия {_date.today():%Y-%m-%d}.zip" if full else
+                          f"DoniniPoster перенос {_date.today():%Y-%m-%d}.zip" if move else "DoniniPoster для передачи.zip")
             skip_dirs = {"__pycache__", "python", "Очередь", "Очередь сайта", "Выставлено", "Скачано WeChat", "_старая_версия", "data"}
             n = 0
             with zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as z:
@@ -733,11 +1058,33 @@ def create_app(engine):
                     rel = p.relative_to(root)
                     if not p.is_file() or any(part in skip_dirs for part in rel.parts[:-1]) or rel.parts[0] in skip_dirs:
                         continue
+                    if rel.parts[0].startswith("_до_переделки") or rel.parts[0] == "Для GitHub" or rel.suffix == ".zip":
+                        continue  # резервная копия старой версии и файлы для GitHub в перенос не нужны
                     if p.name in ("store_icon.done",):
                         continue
                     z.write(p, Path("DoniniPoster") / rel); n += 1
                 for p in (root / "data" / "sites").glob("*.json"):  # записанные сценарии сайтов
                     z.write(p, Path("DoniniPoster") / "data" / "sites" / p.name); n += 1
+                if move and not full:
+                    import json as _json
+                    cfg = _json.loads(C.CONFIG_FILE.read_text("utf-8"))
+                    if not secrets:
+                        cfg["telegram"] = {"token": "", "chat_id": ""}
+                        cfg.pop("ai_key", None)
+                        if isinstance(cfg.get("woo"), dict):
+                            for k in ("ck", "cs", "wp_pass"):
+                                cfg["woo"][k] = ""
+                    for k in ("_root", "_ext_browser", "_autostart_set"):
+                        cfg.pop(k, None)  # новый компьютер определит это сам
+                    for l in cfg.get("lines", []):
+                        l["run"] = "stop" if l.get("id") != "site" else l.get("run", "stop")
+                    z.writestr(str(Path("DoniniPoster") / "data" / "config.json"), _json.dumps(cfg, ensure_ascii=False, indent=2)); n += 1
+                    for name in ("manager_overrides.json", "szwego_shops.json"):
+                        f = root / "data" / name
+                        if f.exists():
+                            z.write(f, Path("DoniniPoster") / "data" / name); n += 1
+                    for p in (root / "data" / "sites").glob(".*"):
+                        z.write(p, Path("DoniniPoster") / "data" / "sites" / p.name); n += 1
                 if full:
                     # резервная копия для себя (переустановка Windows): + настройки, ключи, очередь, шаблоны
                     for p in (root / "data").glob("*"):
@@ -747,7 +1094,9 @@ def create_app(engine):
                         z.write(p, Path("DoniniPoster") / "data" / "sites" / p.name); n += 1
             return str(dst), n
         path, n = await asyncio.to_thread(make)
-        engine.log(f"💾 Резервная копия: {path} (файлов {n})" if full else f"📦 Копия программы для передачи: {path} (файлов {n})")
+        engine.log(f"💾 Резервная копия: {path} (файлов {n})" if full else
+                   f"📦 Файл переноса на другой компьютер: {path} (файлов {n}{', с паролями и ключами' if secrets else ', без паролей и ключей'})" if move
+                   else f"📦 Копия программы для передачи: {path} (файлов {n})")
         return {"ok": True, "path": path, "files": n}
 
     @app.get("/api/version")
@@ -1390,12 +1739,15 @@ def create_app(engine):
         import shutil
         removed, failed = 0, 0
         try:
-            only = (await req.json()).get("only")
+            d = await req.json()
         except Exception:
-            only = None
+            d = {}
+        only, only_line = d.get("only"), d.get("line")
         for pid, p in list(engine.state["products"].items()):
             if p.get("status") == "archived":
                 continue  # уже выставленные (история) не трогаем
+            if only_line and p.get("line") != only_line:
+                continue  # новое окно: очищается одна очередь
             # «Очередь» и «Очередь сайта» чистятся отдельно
             if only == "site" and p.get("line") != "site":
                 continue
@@ -1577,6 +1929,12 @@ def create_app(engine):
                 raise HTTPException(400, "Сначала заполните адрес сайта и ключи и нажмите «Проверить подключение»")
         site["enabled"] = on
         C.save_site(site)
+        cfg = C.load_config()  # кнопка старого окна / расширения = Старт/Стоп очереди «Мой сайт»
+        for l in cfg["lines"]:
+            if l["id"] == "site":
+                l["run"] = "run" if on else "stop"
+        C.save_config(cfg)
+        engine.cfg = C.load_config()
         if on:
             # товары, которые не загрузились раньше (ошибка), пробуем снова
             n = 0
@@ -1742,12 +2100,21 @@ def create_app(engine):
         return {k: ad.get(k, "") for k in ("title", "body", "price", "currency", "size", "code", "brand")}
 
     @app.get("/api/ext/state")
-    async def ext_state(all: int = 0):
+    async def ext_state(all: int = 0, run: int = 0):
+        return ext_state_data(all, run)
+
+    def ext_state_data(all=0, run=0):
         sites = ext_sites()
         ids = {s["id"]: s for s in sites}
         all_ids = {s["id"]: s for s in C.load_sites() if s.get("type") in ("ext", "manual")}
-        # очереди, выключенные для выгрузки (кнопка на плитке очереди) — авто-режим их не берёт; пачка (all=1) — берёт
-        off_lines = set() if all else {l["id"] for l in engine.cfg["lines"] if l.get("paused")}
+        # очереди, выключенные для выгрузки (кнопка на плитке очереди) — авто-режим их не берёт; пачка (all=1) — берёт.
+        # run=1 — авто-режим, который запустила сама программа (кнопки «Старт»): только очереди в состоянии «работает»
+        if all:
+            off_lines = set()
+        elif run:
+            off_lines = {l["id"] for l in engine.cfg["lines"] if C.line_run(l) != "run"}
+        else:
+            off_lines = {l["id"] for l in engine.cfg["lines"] if l.get("paused")}
         prods, noprice = [], []
         for p in sorted(engine.state["products"].values(), key=lambda x: x["added"]):
             if p.get("line") in off_lines and p["status"] != "archived":
@@ -1795,6 +2162,20 @@ def create_app(engine):
         # исправления идут вперемешку с очередью (1 товар из очереди, 1 исправление) — очередь не стоит
         q = [x for x in prods if not x.get("edit")]
         e = [x for x in prods if x.get("edit")]
+        if run:
+            # несколько запущенных очередей идут вперемешку: товар из одной, потом из другой…
+            # внутри очереди сначала товары, которые ждут все её сайты; недоделанные — в конце
+            lsites = {l["id"]: {x for x in l.get("sites", []) if x in ids} for l in engine.cfg["lines"]}
+            by = {}
+            for x in q:
+                full = {s["id"] for s in x["sites"]} >= lsites.get(x["line"], set())
+                by.setdefault(x["line"], ([], []))[0 if full else 1].append(x)
+            groups = [a + b for a, b in by.values()]
+            q = []
+            while any(groups):
+                for g in groups:
+                    if g:
+                        q.append(g.pop(0))
         _at = {p["id"]: min((str(st.get("at") or "") for st in p["sites"].values() if st.get("edit")), default="")
                for p in engine.state["products"].values()}
         e.sort(key=lambda x: _at.get(x["id"], ""))
@@ -2081,6 +2462,15 @@ def create_app(engine):
         if C.PREPARED_DIR.resolve() not in p.parents or not p.exists():
             raise HTTPException(404)
         return FileResponse(p, media_type="image/jpeg")
+
+    @app.post("/api/app/show_window")
+    async def show_window():
+        """Кнопка «Открыть Donini Poster» в расширении: показать окно программы (или открыть его)."""
+        fn = getattr(engine, "show_window", None)
+        if not fn:
+            raise HTTPException(404, "недоступно")
+        await asyncio.get_event_loop().run_in_executor(None, fn)
+        return {"ok": True}
 
     @app.post("/api/quit")
     async def quit_app():
